@@ -1,0 +1,253 @@
+/* ============================================
+   PPT Kit Vue3 Demo - Global Styles
+   ============================================ */
+
+:root {
+  --color-bg: #0f1117;
+  --color-bg-secondary: #161822;
+  --color-bg-tertiary: #1e2030;
+  --color-bg-hover: #252840;
+  --color-border: #2a2d3e;
+  --color-border-focus: #5b6abf;
+  --color-text: #e4e6f0;
+  --color-text-secondary: #8b8fa8;
+  --color-text-dim: #5c6078;
+  --color-primary: #6c7ae0;
+  --color-primary-hover: #7b88e8;
+  --color-primary-active: #5b68c7;
+  --color-accent: #00d4aa;
+  --color-accent-hover: #00e8bb;
+  --color-danger: #e05c6c;
+  --color-danger-hover: #e87080;
+  --color-warning: #e0a840;
+  --color-code-bg: #1a1d2e;
+  --color-success: #4caf50;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --transition: all 0.2s ease;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+#app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-dim);
+}
+
+/* Code Highlighting Theme */
+.hljs {
+  background: var(--color-code-bg) !important;
+  color: #e4e6f0 !important;
+  padding: 16px !important;
+  border-radius: var(--radius-sm) !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+}
+
+.hljs-keyword { color: #c792ea; }
+.hljs-string { color: #c3e88d; }
+.hljs-number { color: #f78c6c; }
+.hljs-function { color: #82aaff; }
+.hljs-comment { color: #546e7a; font-style: italic; }
+.hljs-title { color: #82aaff; }
+.hljs-attr { color: #ffcb6b; }
+.hljs-built_in { color: #89ddff; }
+.hljs-type { color: #ffcb6b; }
+.hljs-params { color: #e4e6f0; }
+.hljs-meta { color: #89ddff; }
+.hljs-variable { color: #f07178; }
+.hljs-selector-class { color: #ffcb6b; }
+.hljs-selector-tag { color: #f07178; }
+.hljs-tag { color: #f07178; }
+.hljs-name { color: #f07178; }
+.hljs-attribute { color: #c792ea; }
+
+/* Markdown Preview */
+.markdown-preview {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.markdown-preview h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--color-text);
+  border-bottom: 2px solid var(--color-border);
+  padding-bottom: 8px;
+}
+
+.markdown-preview h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-top: 20px;
+  margin-bottom: 12px;
+  color: var(--color-text);
+}
+
+.markdown-preview h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.markdown-preview p {
+  margin-bottom: 12px;
+}
+
+.markdown-preview ul, .markdown-preview ol {
+  padding-left: 24px;
+  margin-bottom: 12px;
+}
+
+.markdown-preview li {
+  margin-bottom: 4px;
+}
+
+.markdown-preview code {
+  background: var(--color-code-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.9em;
+  color: var(--color-accent);
+}
+
+.markdown-preview pre {
+  margin-bottom: 16px;
+  border-radius: var(--radius-sm);
+  overflow: auto;
+}
+
+.markdown-preview pre code {
+  padding: 0;
+  background: none;
+  color: inherit;
+}
+
+.markdown-preview blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding: 8px 16px;
+  margin: 12px 0;
+  background: rgba(108, 122, 224, 0.08);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--color-text-secondary);
+}
+
+.markdown-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+
+.markdown-preview th, .markdown-preview td {
+  border: 1px solid var(--color-border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-preview th {
+  background: var(--color-bg-tertiary);
+  font-weight: 600;
+}
+
+.markdown-preview img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.markdown-preview a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.markdown-preview a:hover {
+  text-decoration: underline;
+}
+
+.markdown-preview hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 20px 0;
+}
+
+/* Mermaid Diagram */
+.mermaid-container {
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin: 12px 0;
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+}
+
+.mermaid-container svg {
+  max-width: 100%;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease;
+}

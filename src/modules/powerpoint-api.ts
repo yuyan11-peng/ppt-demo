@@ -1,0 +1,342 @@
+/**
+ * PPT Kit - PowerPoint API 桥接模块
+ *
+ * 当运行在 Office Add-in 环境中时，可以通过 PowerPoint.run() API
+ * 直接操作当前演示文稿中的幻灯片。
+ *
+ * 在非 Office 环境中（普通浏览器），这些功能会静默跳过。
+ */
+
+/** 检测是否在 Office Add-in 环境中运行 */
+export function isOfficeContext(): boolean {
+  return !!(globalThis as any).Office?.context
+}
+
+/**
+ * 获取 Office 上下文（如果可用）
+ */
+export function getOfficeContext() {
+  if (isOfficeContext()) {
+    return (globalThis as any).Office
+  }
+  return null
+}
+
+/** 大纲幻灯片数据 */
+export interface OutlineSlide {
+  title: string
+  bullets: string[]
+}
+
+/**
+ * 根据主题生成 PPT 大纲
+ * 目前使用本地模拟逻辑，后续可接入 AI API
+ */
+export function generateOutline(topic: string, pageCount?: number, language?: string): OutlineSlide[] {
+  const count = pageCount && pageCount > 0 ? Math.min(pageCount, 20) : 6
+
+  // 根据主题生成大纲结构
+  const outlineTemplates: Record<string, OutlineSlide[]> = {
+    default: [
+      { title: topic, bullets: ['项目概述与背景介绍', '核心价值与目标'] },
+      { title: '背景与现状', bullets: ['行业现状分析', '面临的挑战与机遇', '市场需求洞察'] },
+      { title: '核心方案', bullets: ['解决方案概述', '技术架构设计', '关键功能特性', '创新亮点'] },
+      { title: '实施计划', bullets: ['阶段一：需求调研与设计', '阶段二：开发与测试', '阶段三：上线与推广', '里程碑节点'] },
+      { title: '预期成果', bullets: ['量化目标与 KPI', '业务价值评估', '用户体验提升', '成本效益分析'] },
+      { title: '总结与展望', bullets: ['项目总结', '下一步计划', '感谢与问答'] },
+    ]
+  }
+
+  let slides = outlineTemplates.default
+
+  // 根据页数调整
+  if (count < slides.length) {
+    slides = slides.slice(0, count)
+  } else if (count > slides.length) {
+    // 补充更多页面
+    const extras = [
+      { title: '团队介绍', bullets: ['核心团队成员', '专业背景与经验', '分工与协作'] },
+      { title: '竞品分析', bullets: ['主要竞争对手', '差异化优势', '市场定位'] },
+      { title: '技术细节', bullets: ['技术选型', '系统架构', '性能指标'] },
+      { title: '风险评估', bullets: ['潜在风险识别', '应对策略', '风险监控机制'] },
+      { title: '案例展示', bullets: ['成功案例一', '成功案例二', '客户反馈'] },
+      { title: '数据分析', bullets: ['关键数据指标', '趋势分析', '数据驱动决策'] },
+      { title: '用户反馈', bullets: ['用户调研结果', '满意度评分', '改进建议'] },
+      { title: '路线图', bullets: ['短期目标 (1-3月)', '中期目标 (3-6月)', '长期目标 (6-12月)'] },
+    ]
+    for (let i = slides.length; i < count && i - slides.length < extras.length; i++) {
+      slides.push(extras[i - slides.length])
+    }
+  }
+
+  // 替换第一页标题为用户输入的主题
+  if (slides.length > 0) {
+    slides[0].title = topic
+  }
+
+  return slides
+}
+
+/**
+ * 将大纲内容写入 PowerPoint 演示文稿
+ * 自动检测 API 版本：
+ *   - PowerPointApi 1.4+  → 使用 textFrame API 直接读写形状文本
+ *   - PowerPointApi 1.1~1.2（Office 2021 等） → 使用 Common API setSelectedDataAsync 写入
+ */
+export async function applyOutlineToPowerPoint(outline: OutlineSlide[]): Promise<{ success: boolean; message: string }> {
+  if (!isOfficeContext()) {
+    return { success: false, message: '当前不在 Office 环境中' }
+  }
+
+  const Office = (globalThis as any).Office
+  const supports14 = !!Office.context.requirements?.isSetSupported?.('PowerPointApi', '1.4')
+  console.log('[PowerPoint API] PowerPointApi 1.4 supported:', supports14)
+
+  if (supports14) {
+    return applyOutlineViaTextFrame(outline)
+  } else {
+    return applyOutlineViaCommonApi(outline)
+  }
+}
+
+/**
+ * 方案 A：通过 textFrame API 写入大纲（PowerPointApi 1.4+）
+ * 适用于 Microsoft 365 订阅版
+ */
+async function applyOutlineViaTextFrame(outline: OutlineSlide[]): Promise<{ success: boolean; message: string }> {
+  try {
+    const PowerPoint = (globalThis as any).Office.PowerPoint || (globalThis as any).PowerPoint
+
+    await PowerPoint.run(async (context: any) => {
+      const presentation = context.presentation
+      const slides = presentation.slides
+      slides.load('items')
+      await context.sync()
+
+      // 删除多余的幻灯片（保留第一张）
+      const existingCount = slides.items.length
+      for (let i = existingCount - 1; i > 0; i--) {
+        slides.items[i].delete()
+      }
+      await context.sync()
+
+      // 处理第一张幻灯片
+      if (outline.length > 0) {
+        const firstSlide = slides.items[0]
+        const shapes = firstSlide.shapes
+        shapes.load('items,items/textFrame')
+        await context.sync()
+
+        let titleSet = false
+        let bodySet = false
+        for (const shape of shapes.items) {
+          try {
+            shape.textFrame.load('textRange')
+            await context.sync()
+
+            if (!titleSet) {
+              shape.textFrame.textRange.text = outline[0].title
+              titleSet = true
+            } else if (!bodySet) {
+              shape.textFrame.textRange.text = outline[0].bullets.join('\n')
+              bodySet = true
+            }
+          } catch {
+            // 某些形状没有 textFrame，跳过
+          }
+        }
+        await context.sync()
+      }
+
+      // 添加后续幻灯片
+      for (let i = 1; i < outline.length; i++) {
+        presentation.slides.add()
+        await context.sync()
+
+        slides.load('items')
+        await context.sync()
+
+        const newSlide = slides.items[slides.items.length - 1]
+        const shapes = newSlide.shapes
+        shapes.load('items,items/textFrame')
+        await context.sync()
+
+        let titleSet = false
+        let bodySet = false
+        for (const shape of shapes.items) {
+          try {
+            shape.textFrame.load('textRange')
+            await context.sync()
+
+            if (!titleSet) {
+              shape.textFrame.textRange.text = outline[i].title
+              titleSet = true
+            } else if (!bodySet) {
+              shape.textFrame.textRange.text = outline[i].bullets.join('\n')
+              bodySet = true
+            }
+          } catch {
+            // 跳过没有 textFrame 的形状
+          }
+        }
+        await context.sync()
+      }
+    })
+
+    return { success: true, message: `已生成 ${outline.length} 张幻灯片` }
+  } catch (e) {
+    console.error('[PowerPoint API][A] 写入失败:', e)
+    return { success: false, message: `操作失败: ${(e as Error).message}` }
+  }
+}
+
+/**
+ * 方案 B：通过 Common API 写入大纲（兼容 Office 2021 等只支持 1.1~1.2 的版本）
+ *
+ * 思路：
+ *   1. 使用 PowerPoint.run 添加幻灯片（1.2 支持 insertSlidesFromBase64，但比较复杂）
+ *   2. 更简单的做法：用 setSelectedDataAsync + SlideScope 逐页写入文本
+ *
+ * 在不支持 textFrame 的环境中，最可靠的方案是：
+ *   - 使用 insertSlidesFromBase64 从模板插入幻灯片（1.2 支持）
+ *   - 或用 setSelectedDataAsync(Ooxml) 写入内容
+ *   - 这里采用最简单的方案：用 setSelectedDataAsync(Text) 逐步写入
+ */
+async function applyOutlineViaCommonApi(outline: OutlineSlide[]): Promise<{ success: boolean; message: string }> {
+  const Office = (globalThis as any).Office
+  const PowerPoint = Office.PowerPoint || (globalThis as any).PowerPoint
+
+  try {
+    // 第一步：用 PowerPoint.run 管理幻灯片结构（添加/删除幻灯片，1.2 支持）
+    const supports12 = !!Office.context.requirements?.isSetSupported?.('PowerPointApi', '1.2')
+    console.log('[PowerPoint API][B] PowerPointApi 1.2 supported:', supports12)
+
+    if (supports12 && outline.length > 1) {
+      await PowerPoint.run(async (context: any) => {
+        const presentation = context.presentation
+        const slides = presentation.slides
+        slides.load('items')
+        await context.sync()
+
+        // 删除多余幻灯片（保留第一张）
+        const existingCount = slides.items.length
+        for (let i = existingCount - 1; i > 0; i--) {
+          slides.items[i].delete()
+        }
+        await context.sync()
+
+        // 添加需要的幻灯片数量
+        for (let i = 1; i < outline.length; i++) {
+          presentation.slides.add()
+        }
+        await context.sync()
+        console.log(`[PowerPoint API][B] 已准备 ${outline.length} 张幻灯片`)
+      })
+    }
+
+    // 第二步：用 Common API setSelectedDataAsync 逐页写入文本
+    // 首先尝试选中并写入每一页的内容
+    for (let i = 0; i < outline.length; i++) {
+      const slideContent = outline[i].title + '\n\n' + outline[i].bullets.join('\n')
+
+      // 通过 goToByIdAsync 定位到对应幻灯片（Common API）
+      await goToSlideIndex(Office, i)
+
+      // 短暂等待幻灯片切换完成
+      await sleep(300)
+
+      // 写入文本内容
+      await setSelectedText(Office, slideContent)
+      console.log(`[PowerPoint API][B] 已写入第 ${i + 1} 页`)
+    }
+
+    return { success: true, message: `已生成 ${outline.length} 张幻灯片（兼容模式）` }
+  } catch (e) {
+    console.error('[PowerPoint API][B] 写入失败:', e)
+    return { success: false, message: `操作失败: ${(e as Error).message}` }
+  }
+}
+
+/** 通过 Common API 跳转到指定索引的幻灯片 */
+function goToSlideIndex(Office: any, index: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      Office.context.document.goToByIdAsync(
+        index + 1, // Office 幻灯片从 1 开始
+        Office.GoToType.Index,
+        (result: any) => {
+          if (result.status === Office.AsyncResultStatus.Succeeded) {
+            resolve()
+          } else {
+            console.warn(`[PowerPoint API][B] goToByIdAsync 失败:`, result.error?.message)
+            resolve() // 不中断流程
+          }
+        }
+      )
+    } catch {
+      resolve() // 不中断流程
+    }
+  })
+}
+
+/** 通过 Common API 写入文本到当前选中位置 */
+function setSelectedText(Office: any, text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      Office.context.document.setSelectedDataAsync(
+        text,
+        { coercionType: Office.CoercionType.Text },
+        (result: any) => {
+          if (result.status === Office.AsyncResultStatus.Succeeded) {
+            resolve()
+          } else {
+            console.warn(`[PowerPoint API][B] setSelectedDataAsync 失败:`, result.error?.message)
+            resolve() // 不中断流程
+          }
+        }
+      )
+    } catch {
+      resolve()
+    }
+  })
+}
+
+/** 简单的延时函数 */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * 将当前 PPT Kit 幻灯片内容写入 PowerPoint 演示文稿
+ */
+export async function syncToPowerPoint(slides: Array<{
+  title: string
+  markdown: string
+  layout: string
+}>): Promise<{ success: boolean; message: string }> {
+  const outline: OutlineSlide[] = slides.map(s => ({
+    title: s.title,
+    bullets: extractBodyText(s.markdown).split('\n').filter(l => l.trim())
+  }))
+  return applyOutlineToPowerPoint(outline)
+}
+
+/**
+ * 从 Markdown 中提取正文文本（去掉标题和代码块）
+ */
+function extractBodyText(markdown: string): string {
+  return markdown
+    .split('\n')
+    .filter(line => {
+      const trimmed = line.trim()
+      return trimmed &&
+        !trimmed.startsWith('#') &&
+        !trimmed.startsWith('```') &&
+        !trimmed.startsWith('|') &&
+        !trimmed.startsWith('![') &&
+        !trimmed.startsWith('---')
+    })
+    .map(line => line.replace(/^[-*]\s+/, '- ').replace(/\*\*/g, '').replace(/`/g, ''))
+    .join('\n')
+    .slice(0, 2000)
+}

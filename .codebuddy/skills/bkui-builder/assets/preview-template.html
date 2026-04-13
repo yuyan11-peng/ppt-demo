@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{PAGE_TITLE}} - BKUI Demo Preview</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bkui-vue@2.0.2-beta.112/dist/style.variable.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: PingFang SC,Microsoft Yahei,Helvetica,Aria; background: #f5f7fa; }
+    #app { padding: 24px; min-height: 100vh; }
+    {{CUSTOM_STYLES}}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>window.process = { env: { NODE_ENV: 'production' } };</script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bkui-vue@2.0.2-beta.112/dist/index.umd.js"></script>
+  <script>
+    const { createApp, ref, reactive, computed, onMounted, watch, watchEffect, nextTick, toRefs, toRef, markRaw, shallowRef, h, resolveComponent } = Vue;
+    const app = createApp({
+      template: `{{COMPONENT_TEMPLATE}}`,
+      setup() {
+        {{COMPONENT_SETUP}}
+      }
+    });
+    app.use(bkuiVue.default || bkuiVue);
+    app.mount('#app');
+  </script>
+</body>
+</html>
