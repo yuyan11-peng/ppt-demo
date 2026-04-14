@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui" onLoad="OnRibbonLoad">
+  <ribbon>
+    <tabs>
+      <tab id="BangBangTab" label="办公帮帮">
+        <group id="AiAssistantGroup" label="AI助手">
+          <button id="BtnGeneratePPT"
+                  getLabel="GetButtonLabel"
+                  size="large"
+                  onAction="OnButtonPressed" screentip="一键生成PPT"
+                  supertip="输入主题，AI 帮您快速生成完整演示文稿"
+                  getImage="GetButtonImage" />
+          <button id="BtnAIImage"
+                  getLabel="GetButtonLabel"
+                  size="large"
+                  onAction="OnButtonPressed" screentip="AI生图"
+                  supertip="AI 生成图片素材"
+                  getImage="GetButtonImage" />
+          <button id="BtnOptimizeContent"
+                  getLabel="GetButtonLabel"
+                  size="large"
+                  onAction="OnButtonPressed" screentip="内容优化"
+                  supertip="选中文本后进行智能改写和内容优化"
+                  getImage="GetButtonImage" />
+          <button id="BtnLayoutOptimize"
+                  getLabel="GetButtonLabel"
+                  size="large"
+                  onAction="OnButtonPressed" screentip="排版优化"
+                  supertip="统一格式，美化布局"
+                  getImage="GetButtonImage" />
+        </group>
+
+        <group id="MaterialGroup" label="素材库">
+          <button id="BtnTemplates"
+                  getLabel="GetButtonLabel"
+                  size="large"
+                  onAction="OnButtonPressed" screentip="模板"
+                  supertip="选择模板应用到当前演示文稿"
+                  getImage="GetButtonImage" />
+          <button id="BtnImages"
+                  getLabel="GetButtonLabel"
+                  size="large"
+                  onAction="OnButtonPressed" screentip="图片"
+                  supertip="浏览并插入图片素材"
+                  getImage="GetButtonImage" />
+          <button id="BtnIcons"
+                  getLabel="GetButtonLabel"
+                  size="large"
+                  onAction="OnButtonPressed" screentip="图标"
+                  supertip="插入矢量图标素材"
+                  getImage="GetButtonImage" />
+        </group>
+
+        <group id="SidebarGroup" label=" ">
+          <button id="BtnSidebar"
+                  getLabel="GetButtonLabel"
+                  size="large"
+                  onAction="OnButtonPressed" screentip="侧边栏"
+                  supertip="打开办公帮帮完整功能面板"
+                  getImage="GetButtonImage" />
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>

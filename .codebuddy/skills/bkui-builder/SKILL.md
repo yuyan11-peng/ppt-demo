@@ -1,11 +1,11 @@
-<!-- BKUI-KNOWLEDGE-MANAGED:5bd56021268a -->
+<!-- BKUI-KNOWLEDGE-MANAGED:209c0eba6e6d -->
 ---
 id: engineering/bkui-builder
 name: 蓝鲸 MagicBox 3.0 组件专家规则
 category: engineering
 description: 设计稿还原规则。先输出布局分析报告，再按需加载模版
 tags: [vue3, bkui-vue, rules, template, expert]
-updated_at: 2026-01-19
+updated_at: 2026-04-08
 ---
 
 # 蓝鲸 MagicBox 3.0 组件专家规则
@@ -35,7 +35,7 @@ updated_at: 2026-01-19
 
 **Step 3: 参考模版生成代码**
 
-**Step 4: 生成预览** — preview-guide → `demos/`；快捷：`/bkui-knowledge/BKUI-DEMO`
+**Step 4: 生成预览**（可选）— 使用 `bkui-demo` skill 生成独立 HTML 预览文件
 
 ## 基础结构
 
@@ -59,14 +59,11 @@ import { Search, Plus, Close } from 'bkui-vue/lib/icon';
 // ❌ 错误: import { Search } from '@bkui-vue/icon';
 ```
 
-**预览 HTML 写法（UMD 环境）：**
-> UMD 构建不含独立 icon 组件。推荐用 importmap + ESM 动态导入 `lib/icon/*.js`；或 inline SVG 兜底。详见 `./references/preview-guide.md`
-
 ## 📦 更多资源
 
 - `./references/code-snippets.md` — 代码片段
 - `./references/checklist.md` — 质量检查
-- `./references/preview-guide.md` — 预览转换指南
+- `./references/visual-mapping.md` — 图标映射
 
 
 ---
@@ -74,7 +71,6 @@ import { Search, Plus, Close } from 'bkui-vue/lib/icon';
 
 - `./references/checklist.md`
 - `./references/code-snippets.md`
-- `./references/preview-guide.md`
 - `./references/visual-mapping.md`
 - `./assets/examples/table-page-preview.html`
 - `./assets/layouts/admin-layout-dark.vue`
@@ -84,6 +80,5 @@ import { Search, Plus, Close } from 'bkui-vue/lib/icon';
 - `./assets/pages/detail-page.vue`
 - `./assets/pages/table-page.vue`
 - `./assets/pages/wizard-form.vue`
-- `./assets/preview-template.html`
 
 > 根据 SKILL.md 中的 IF-THEN 规则判断是否需要加载

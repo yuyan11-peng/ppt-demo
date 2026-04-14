@@ -7,11 +7,11 @@
   xsi:type="TaskPaneApp">
 
   <Id>12345678-1234-1234-1234-123456789abc</Id>
-  <Version>1.0.0.0</Version>
-  <ProviderName>PPT Kit</ProviderName>
+  <Version>1.0.0.14</Version>
+  <ProviderName>办公帮帮</ProviderName>
   <DefaultLocale>zh-CN</DefaultLocale>
-  <DisplayName DefaultValue="PPT Kit - AI Smart Presentation" />
-  <Description DefaultValue="Smart PPT editor based on Vue3 and MCP protocol, supports AI-assisted creation, Markdown editing and PPTX export" />
+  <DisplayName DefaultValue="办公帮帮 - AI 智能助手" />
+  <Description DefaultValue="基于 Vue3 和 AI 的智能演示文稿工具，支持一键生成PPT、AI生图、内容优化、排版优化等功能" />
   <IconUrl DefaultValue="https://localhost:8989/icons/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:8989/icons/icon-80.png" />
   <SupportUrl DefaultValue="https://github.com" />
@@ -41,24 +41,167 @@
           </GetStarted>
           <FunctionFile resid="Taskpane.Url" />
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
-            <CustomTab id="PptKitTab">
-              <Group id="PptKitGroup">
-                <Label resid="CommandsGroup.Label" />
+            <CustomTab id="BangBangTab">
+              <Label resid="TabLabel" />
+
+              <!-- AI 助手组 -->
+              <Group id="AiAssistantGroup">
+                <Label resid="AiGroup.Label" />
                 <Icon>
-                  <bt:Image size="16" resid="Icon.16x16" />
-                  <bt:Image size="32" resid="Icon.32x32" />
-                  <bt:Image size="80" resid="Icon.80x80" />
+                  <bt:Image size="16" resid="Icon.Generate.16" />
+                  <bt:Image size="32" resid="Icon.Generate.32" />
+                  <bt:Image size="80" resid="Icon.Generate.80" />
                 </Icon>
-                <Control xsi:type="Button" id="PptKitOpenButton">
-                  <Label resid="TaskpaneButton.Label" />
+
+                <Control xsi:type="Button" id="BtnGeneratePPT">
+                  <Label resid="BtnGenerate.Label" />
                   <Supertip>
-                    <Title resid="TaskpaneButton.Label" />
-                    <Description resid="TaskpaneButton.Tooltip" />
+                    <Title resid="BtnGenerate.Label" />
+                    <Description resid="BtnGenerate.Tooltip" />
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.16x16" />
-                    <bt:Image size="32" resid="Icon.32x32" />
-                    <bt:Image size="80" resid="Icon.80x80" />
+                    <bt:Image size="16" resid="Icon.Generate.16" />
+                    <bt:Image size="32" resid="Icon.Generate.32" />
+                    <bt:Image size="80" resid="Icon.Generate.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>OfficeAddin1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Generate.Url" />
+                  </Action>
+                </Control>
+
+                <Control xsi:type="Button" id="BtnAIImage">
+                  <Label resid="BtnAIImage.Label" />
+                  <Supertip>
+                    <Title resid="BtnAIImage.Label" />
+                    <Description resid="BtnAIImage.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.AIImage.16" />
+                    <bt:Image size="32" resid="Icon.AIImage.32" />
+                    <bt:Image size="80" resid="Icon.AIImage.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>OfficeAddin1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.AIImage.Url" />
+                  </Action>
+                </Control>
+
+                <Control xsi:type="Button" id="BtnOptimizeContent">
+                  <Label resid="BtnOptimizeContent.Label" />
+                  <Supertip>
+                    <Title resid="BtnOptimizeContent.Label" />
+                    <Description resid="BtnOptimizeContent.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.OptimizeContent.16" />
+                    <bt:Image size="32" resid="Icon.OptimizeContent.32" />
+                    <bt:Image size="80" resid="Icon.OptimizeContent.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>OfficeAddin1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Optimize.Url" />
+                  </Action>
+                </Control>
+
+                <Control xsi:type="Button" id="BtnLayoutOptimize">
+                  <Label resid="BtnLayoutOptimize.Label" />
+                  <Supertip>
+                    <Title resid="BtnLayoutOptimize.Label" />
+                    <Description resid="BtnLayoutOptimize.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.LayoutOptimize.16" />
+                    <bt:Image size="32" resid="Icon.LayoutOptimize.32" />
+                    <bt:Image size="80" resid="Icon.LayoutOptimize.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>OfficeAddin1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Layout.Url" />
+                  </Action>
+                </Control>
+              </Group>
+
+              <!-- 素材库组 -->
+              <Group id="MaterialGroup">
+                <Label resid="MaterialGroup.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.Template.16" />
+                  <bt:Image size="32" resid="Icon.Template.32" />
+                  <bt:Image size="80" resid="Icon.Template.80" />
+                </Icon>
+
+                <Control xsi:type="Button" id="BtnTemplates">
+                  <Label resid="BtnTemplate.Label" />
+                  <Supertip>
+                    <Title resid="BtnTemplate.Label" />
+                    <Description resid="BtnTemplate.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.Template.16" />
+                    <bt:Image size="32" resid="Icon.Template.32" />
+                    <bt:Image size="80" resid="Icon.Template.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>OfficeAddin1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Template.Url" />
+                  </Action>
+                </Control>
+
+                <Control xsi:type="Button" id="BtnImages">
+                  <Label resid="BtnImage.Label" />
+                  <Supertip>
+                    <Title resid="BtnImage.Label" />
+                    <Description resid="BtnImage.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.Image.16" />
+                    <bt:Image size="32" resid="Icon.Image.32" />
+                    <bt:Image size="80" resid="Icon.Image.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>OfficeAddin1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Images.Url" />
+                  </Action>
+                </Control>
+
+                <Control xsi:type="Button" id="BtnIcons">
+                  <Label resid="BtnIcon.Label" />
+                  <Supertip>
+                    <Title resid="BtnIcon.Label" />
+                    <Description resid="BtnIcon.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.IconItem.16" />
+                    <bt:Image size="32" resid="Icon.IconItem.32" />
+                    <bt:Image size="80" resid="Icon.IconItem.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>OfficeAddin1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Icons.Url" />
+                  </Action>
+                </Control>
+              </Group>
+
+              <!-- 侧边栏组 -->
+              <Group id="SidebarGroup">
+                <Label resid="SidebarGroup.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.Sidebar.16" />
+                  <bt:Image size="32" resid="Icon.Sidebar.32" />
+                  <bt:Image size="80" resid="Icon.Sidebar.80" />
+                </Icon>
+
+                <Control xsi:type="Button" id="BtnSidebar">
+                  <Label resid="BtnSidebar.Label" />
+                  <Supertip>
+                    <Title resid="BtnSidebar.Label" />
+                    <Description resid="BtnSidebar.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.Sidebar.16" />
+                    <bt:Image size="32" resid="Icon.Sidebar.32" />
+                    <bt:Image size="80" resid="Icon.Sidebar.80" />
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <TaskpaneId>OfficeAddin1</TaskpaneId>
@@ -66,7 +209,6 @@
                   </Action>
                 </Control>
               </Group>
-              <Label resid="TabLabel" />
             </CustomTab>
           </ExtensionPoint>
         </DesktopFormFactor>
@@ -74,23 +216,68 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:8989/icons/icon-16.png" />
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:8989/icons/icon-32.png" />
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:8989/icons/icon-80.png" />
+        <!-- 组/应用图标 -->
+        <bt:Image id="Icon.Generate.16" DefaultValue="https://localhost:8989/icons/generate-16.png" />
+        <bt:Image id="Icon.Generate.32" DefaultValue="https://localhost:8989/icons/generate-32.png" />
+        <bt:Image id="Icon.Generate.80" DefaultValue="https://localhost:8989/icons/generate-80.png" />
+        <bt:Image id="Icon.AIImage.16" DefaultValue="https://localhost:8989/icons/aiimage-16.png" />
+        <bt:Image id="Icon.AIImage.32" DefaultValue="https://localhost:8989/icons/aiimage-32.png" />
+        <bt:Image id="Icon.AIImage.80" DefaultValue="https://localhost:8989/icons/aiimage-80.png" />
+        <bt:Image id="Icon.OptimizeContent.16" DefaultValue="https://localhost:8989/icons/optimize-content-16.png" />
+        <bt:Image id="Icon.OptimizeContent.32" DefaultValue="https://localhost:8989/icons/optimize-content-32.png" />
+        <bt:Image id="Icon.OptimizeContent.80" DefaultValue="https://localhost:8989/icons/optimize-content-80.png" />
+        <bt:Image id="Icon.LayoutOptimize.16" DefaultValue="https://localhost:8989/icons/layout-optimize-16.png" />
+        <bt:Image id="Icon.LayoutOptimize.32" DefaultValue="https://localhost:8989/icons/layout-optimize-32.png" />
+        <bt:Image id="Icon.LayoutOptimize.80" DefaultValue="https://localhost:8989/icons/layout-optimize-80.png" />
+        <bt:Image id="Icon.Template.16" DefaultValue="https://localhost:8989/icons/template-16.png" />
+        <bt:Image id="Icon.Template.32" DefaultValue="https://localhost:8989/icons/template-32.png" />
+        <bt:Image id="Icon.Template.80" DefaultValue="https://localhost:8989/icons/template-80.png" />
+        <bt:Image id="Icon.Image.16" DefaultValue="https://localhost:8989/icons/image-16.png" />
+        <bt:Image id="Icon.Image.32" DefaultValue="https://localhost:8989/icons/image-32.png" />
+        <bt:Image id="Icon.Image.80" DefaultValue="https://localhost:8989/icons/image-80.png" />
+        <bt:Image id="Icon.IconItem.16" DefaultValue="https://localhost:8989/icons/icon-item-16.png" />
+        <bt:Image id="Icon.IconItem.32" DefaultValue="https://localhost:8989/icons/icon-item-32.png" />
+        <bt:Image id="Icon.IconItem.80" DefaultValue="https://localhost:8989/icons/icon-item-80.png" />
+        <bt:Image id="Icon.Sidebar.16" DefaultValue="https://localhost:8989/icons/sidebar-16.png" />
+        <bt:Image id="Icon.Sidebar.32" DefaultValue="https://localhost:8989/icons/sidebar-32.png" />
+        <bt:Image id="Icon.Sidebar.80" DefaultValue="https://localhost:8989/icons/sidebar-80.png" />
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:8989/index.html" />
+        <bt:Url id="Taskpane.Generate.Url" DefaultValue="https://localhost:8989/index.html?action=generate" />
+        <bt:Url id="Taskpane.AIImage.Url" DefaultValue="https://localhost:8989/index.html?action=aiimage" />
+        <bt:Url id="Taskpane.Optimize.Url" DefaultValue="https://localhost:8989/index.html?action=optimize" />
+        <bt:Url id="Taskpane.Layout.Url" DefaultValue="https://localhost:8989/index.html?action=layout" />
+        <bt:Url id="Taskpane.Template.Url" DefaultValue="https://localhost:8989/index.html?action=template" />
+        <bt:Url id="Taskpane.Images.Url" DefaultValue="https://localhost:8989/index.html?action=images" />
+        <bt:Url id="Taskpane.Icons.Url" DefaultValue="https://localhost:8989/index.html?action=icons" />
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://github.com" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="PPT Kit Ready" />
-        <bt:String id="CommandsGroup.Label" DefaultValue="PPT Kit" />
-        <bt:String id="TaskpaneButton.Label" DefaultValue="Open PPT Kit11" />
-        <bt:String id="TabLabel" DefaultValue="PPT Kit" />
+        <bt:String id="GetStarted.Title" DefaultValue="办公帮帮已就绪" />
+        <bt:String id="TabLabel" DefaultValue="办公帮帮" />
+        <bt:String id="AiGroup.Label" DefaultValue="AI助手" />
+        <bt:String id="MaterialGroup.Label" DefaultValue="素材库" />
+        <bt:String id="SidebarGroup.Label" DefaultValue=" " />
+        <bt:String id="BtnGenerate.Label" DefaultValue="一键生成PPT" />
+        <bt:String id="BtnAIImage.Label" DefaultValue="AI生图" />
+        <bt:String id="BtnOptimizeContent.Label" DefaultValue="内容优化" />
+        <bt:String id="BtnLayoutOptimize.Label" DefaultValue="排版优化" />
+        <bt:String id="BtnTemplate.Label" DefaultValue="模板" />
+        <bt:String id="BtnImage.Label" DefaultValue="图片" />
+        <bt:String id="BtnIcon.Label" DefaultValue="图标" />
+        <bt:String id="BtnSidebar.Label" DefaultValue="侧边栏" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Click the PPT Kit button in the ribbon to open the AI smart slide editor." />
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open PPT Kit11 editor panel, use AI to create and edit slides" />
+        <bt:String id="GetStarted.Description" DefaultValue="点击办公帮帮按钮打开 AI 智能助手面板。" />
+        <bt:String id="BtnGenerate.Tooltip" DefaultValue="输入主题，AI 帮您快速生成完整演示文稿" />
+        <bt:String id="BtnAIImage.Tooltip" DefaultValue="AI 生成图片素材" />
+        <bt:String id="BtnOptimizeContent.Tooltip" DefaultValue="选中文本后进行智能改写和内容优化" />
+        <bt:String id="BtnLayoutOptimize.Tooltip" DefaultValue="统一格式，美化布局" />
+        <bt:String id="BtnTemplate.Tooltip" DefaultValue="选择模板应用到当前演示文稿" />
+        <bt:String id="BtnImage.Tooltip" DefaultValue="浏览并插入图片素材" />
+        <bt:String id="BtnIcon.Tooltip" DefaultValue="插入矢量图标素材" />
+        <bt:String id="BtnSidebar.Tooltip" DefaultValue="打开办公帮帮完整功能面板" />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

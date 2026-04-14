@@ -41,6 +41,8 @@ export default defineConfig(({ command }) => ({
     port: DEV_PORT,
     strictPort: true,
     open: false,
+    // Office Add-in 要求 HTTPS，使用受信任的开发证书
+    // 证书来源：office-addin-dev-certs 工具或项目本地 certs/ 目录
     https: getHttpsOptions()
   },
   publicDir: 'public',
