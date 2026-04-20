@@ -1,238 +1,259 @@
 <template>
   <div class="taskpane-root">
-    <!-- ===== 一键生成PPT页面 ===== -->
-    <GeneratePPT
-      v-if="currentPage === 'generate'"
-      ref="generatePPTRef"
-      @back="currentPage = 'home'"
-      @generate="handleGenerateOutline"
-    />
-
-    <!-- ===== 内容优化页面 ===== -->
-    <OptimizeContent
-      v-else-if="currentPage === 'optimize'"
-      ref="optimizeContentRef"
-      @back="currentPage = 'home'"
-      @replace="handleReplaceText"
-    />
-
-    <!-- ===== AI生图页面 ===== -->
-    <div v-else-if="currentPage === 'aiimage'" class="sub-page">
-      <div class="page-header">
-        <button class="back-btn" @click="currentPage = 'home'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <span class="page-title">AI 生图</span>
-      </div>
-      <div class="page-body">
-        <div class="form-section">
-          <label class="form-label">描述你想要的图片</label>
-          <textarea class="form-textarea" v-model="aiImagePrompt" placeholder="例如：一只在星空下奔跑的狐狸..." rows="4"></textarea>
-          <button class="primary-btn" @click="handleAIImageGenerate" :disabled="aiImageLoading">
-            {{ aiImageLoading ? '生成中...' : '生成图片' }}
-          </button>
-        </div>
-        <div v-if="aiImageResult" class="result-section">
-          <img :src="aiImageResult" alt="生成的图片" class="result-image" />
-        </div>
-      </div>
+    <!-- ===== 全局Tab栏（始终显示） ===== -->
+    <div class="global-tabs">
+      <div class="home-tab" :class="{ active: homeTab === 'ai' }" @click="homeTab = 'ai'">AI助手</div>
+      <div class="home-tab" :class="{ active: homeTab === 'material' }" @click="homeTab = 'material'">素材库</div>
     </div>
 
-    <!-- ===== 排版优化页面 ===== -->
-    <div v-else-if="currentPage === 'layout'" class="sub-page">
-      <div class="page-header">
-        <button class="back-btn" @click="currentPage = 'home'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <span class="page-title">排版优化</span>
-      </div>
-      <div class="page-body">
-        <p class="info-text">点击下方按钮将自动分析当前幻灯片并统一格式、美化布局。</p>
-        <button class="primary-btn" @click="handleLayoutOptimize" :disabled="layoutLoading">
-          {{ layoutLoading ? '优化中...' : '开始排版优化' }}
-        </button>
-      </div>
-    </div>
+    <!-- ===== AI助手页面列表 ===== -->
+    <template v-if="homeTab === 'ai'">
+      <!-- 一键生成PPT -->
+      <GeneratePPT
+        v-if="currentPage === 'generate'"
+        ref="generatePPTRef"
+        @back="currentPage = 'home'"
+        @generate="handleGenerateOutline"
+      />
 
-    <!-- ===== 模板页面 ===== -->
-    <div v-else-if="currentPage === 'template'" class="sub-page">
-      <div class="page-header">
-        <button class="back-btn" @click="currentPage = 'home'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <span class="page-title">模板库</span>
-      </div>
-      <div class="page-body">
-        <div class="template-grid">
-          <div class="template-card" v-for="tpl in templates" :key="tpl.id" @click="handleApplyTemplate(tpl)">
-            <div class="template-thumb" :style="{ background: tpl.color }"></div>
-            <div class="template-name">{{ tpl.name }}</div>
+      <!-- 内容优化 -->
+      <OptimizeContent
+        v-else-if="currentPage === 'optimize'"
+        ref="optimizeContentRef"
+        @back="currentPage = 'home'"
+        @replace="handleReplaceText"
+      />
+
+      <!-- AI生图 -->
+      <div v-else-if="currentPage === 'aiimage'" class="sub-page">
+        <div class="page-header">
+          <el-button :icon="ArrowLeft" text @click="currentPage = 'home'" />
+          <span class="page-title">AI 生图</span>
+        </div>
+        <div class="page-body">
+          <div class="ai-image-container" :class="{ 'image-on-left': showImageOnLeft }">
+            <div v-if="showImageOnLeft && aiImageResult" class="left-image">
+              <img :src="aiImageResult" alt="生成的图片" class="result-image" />
+            </div>
+            <div class="form-section" :class="{ 'with-left-image': showImageOnLeft }">
+              <label class="form-label">描述你想要的图片</label>
+              <el-input
+                v-model="aiImagePrompt"
+                type="textarea"
+                placeholder="例如：一只在星空下奔跑的狐狸..."
+                :rows="4"
+                resize="vertical"
+              />
+              <el-button
+                type="primary"
+                @click="handleAIImageGenerate"
+                :loading="aiImageLoading"
+                style="margin-top: 12px; width: 100%;"
+              >
+                {{ aiImageLoading ? '生成中...' : '生成图片' }}
+              </el-button>
+              <div v-if="!showImageOnLeft && aiImageResult" class="result-section">
+                <img 
+                  :src="aiImageResult" 
+                  alt="生成的图片" 
+                  class="result-image"
+                  @click="insertImageToPowerPoint"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ===== 图片页面 ===== -->
-    <div v-else-if="currentPage === 'images'" class="sub-page">
-      <div class="page-header">
-        <button class="back-btn" @click="currentPage = 'home'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <span class="page-title">图片素材</span>
-      </div>
-      <div class="page-body">
-        <p class="info-text">浏览并选择图片插入到当前幻灯片中</p>
-        <div class="image-grid">
-          <div class="image-placeholder" v-for="n in 6" :key="n">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-            <span>图片 {{ n }}</span>
-          </div>
+      <!-- 排版优化 -->
+      <div v-else-if="currentPage === 'layout'" class="sub-page">
+        <div class="page-header">
+          <el-button :icon="ArrowLeft" text @click="currentPage = 'home'" />
+          <span class="page-title">排版优化</span>
         </div>
-      </div>
-    </div>
-
-    <!-- ===== 图标页面 ===== -->
-    <div v-else-if="currentPage === 'icons'" class="sub-page">
-      <div class="page-header">
-        <button class="back-btn" @click="currentPage = 'home'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <span class="page-title">图标素材</span>
-      </div>
-      <div class="page-body">
-        <div class="icon-grid">
-          <div class="icon-item" v-for="(icon, idx) in iconList" :key="idx" :title="icon.name" @click="handleInsertIcon(icon)">
-            <span class="icon-char">{{ icon.char }}</span>
-            <span class="icon-name">{{ icon.name }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ===== 主面板（侧边栏导航） ===== -->
-    <div v-else class="main-panel">
-      <!-- 侧边导航栏 -->
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <span class="logo-text">办公帮帮</span>
-        </div>
-        <nav class="sidebar-nav">
-          <!-- AI 助手区域 -->
-          <div class="nav-group-label">AI 助手</div>
-          <button
-            class="nav-item"
-            :class="{ active: currentPage === 'generate' || currentNav === 'generate' }"
-            @click="navigateTo('generate')"
+        <div class="page-body">
+          <p class="info-text">点击下方按钮将自动分析当前幻灯片并统一格式、美化布局。</p>
+          <el-button
+            type="primary"
+            @click="handleLayoutOptimize"
+            :loading="layoutLoading"
+            style="width: 100%;"
           >
-            <span class="nav-icon icon-generate">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-            </span>
-            <span>一键生成PPT</span>
-          </button>
-          <button class="nav-item" @click="navigateTo('aiimage')">
-            <span class="nav-icon icon-image">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            </span>
-            <span>AI生图</span>
-          </button>
-          <button class="nav-item" @click="navigateTo('optimize')">
-            <span class="nav-icon icon-optimize">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-            </span>
-            <span>内容优化</span>
-          </button>
-          <button class="nav-item" @click="navigateTo('layout')">
-            <span class="nav-icon icon-layout">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z"/></svg>
-            </span>
-            <span>排版优化</span>
-          </button>
+            {{ layoutLoading ? '优化中...' : '开始排版优化' }}
+          </el-button>
+        </div>
+      </div>
 
-          <!-- 素材库区域 -->
-          <div class="nav-group-label">素材库</div>
-          <button class="nav-item" @click="navigateTo('template')">
-            <span class="nav-icon icon-template">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-            </span>
-            <span>模板</span>
-          </button>
-          <button class="nav-item" @click="navigateTo('images')">
-            <span class="nav-icon icon-pictures">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            </span>
-            <span>图片</span>
-          </button>
-          <button class="nav-item" @click="navigateTo('icons')">
-            <span class="nav-icon icon-icons">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5"/></svg>
-            </span>
-            <span>图标</span>
-          </button>
-        </nav>
-      </aside>
-
-      <!-- 右侧内容区 -->
-      <main class="content-area">
-        <!-- 欢迎页 -->
-        <div class="welcome-content">
-          <div class="welcome-logo">
-            <svg viewBox="0 0 48 48" fill="none" width="64" height="64">
-              <rect x="4" y="8" width="40" height="32" rx="4" stroke="#6c7ae0" stroke-width="2.5" fill="#f0f3fa"/>
-              <path d="M14 22h8m-4-4v8m10-4h8" stroke="#6c7ae0" stroke-width="2" stroke-linecap="round"/>
+      <!-- 首页（AI助手卡片） -->
+      <div v-else class="main-panel home-content">
+        <div class="home-card" @click="navigateTo('generate')">
+          <div class="home-card-icon">
+            <svg viewBox="0 0 48 48" width="36" height="36" fill="none">
+              <rect x="8" y="6" width="32" height="36" rx="3" stroke="#e8b86d" stroke-width="2" fill="#fff9f0"/>
+              <line x1="14" y1="16" x2="34" y2="16" stroke="#e8b86d" stroke-width="2"/>
+              <line x1="14" y1="22" x2="30" y2="22" stroke="#ddd" stroke-width="1.5"/>
+              <line x1="14" y1="27" x2="26" y2="27" stroke="#ddd" stroke-width="1.5"/>
+              <circle cx="34" cy="30" r="7" fill="#ff6b6b"/>
+              <path d="M31 30l2 2 4-4" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <h2 class="welcome-title">办公帮帮</h2>
-          <p class="welcome-desc">AI 驱动的智能演示助手</p>
-          <div class="quick-actions">
-            <button class="quick-action-card" @click="navigateTo('generate')">
-              <span class="quick-icon icon-generate">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-              </span>
-              <span>一键生成 PPT</span>
-            </button>
-            <button class="quick-action-card" @click="navigateTo('aiimage')">
-              <span class="quick-icon icon-image">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-              </span>
-              <span>AI 生图</span>
-            </button>
-            <button class="quick-action-card" @click="navigateTo('optimize')">
-              <span class="quick-icon icon-optimize">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-              </span>
-              <span>内容优化</span>
-            </button>
-            <button class="quick-action-card" @click="navigateTo('layout')">
-              <span class="quick-icon icon-layout">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z"/></svg>
-              </span>
-              <span>排版优化</span>
-            </button>
-          </div>
+          <div class="home-card-title">一键生成PPT</div>
+          <div class="home-card-desc">输入主题，AI帮您快速生成完整演示文稿</div>
         </div>
-      </main>
-    </div>
 
-    <!-- Toast -->
-    <Transition name="toast">
-      <div v-if="toast.show" class="taskpane-toast" :class="toast.type">
-        {{ toast.message }}
+        <div class="home-card" @click="navigateTo('optimize')">
+          <div class="home-card-icon">
+            <svg viewBox="0 0 48 48" width="36" height="36" fill="none">
+              <path d="M24 6l4.5 9 10 1.5-7 7 1.5 10L24 29l-9 4.5 1.5-10-7-7 10-1.5L24 6z" fill="#ffd666" stroke="#e8b86d" stroke-width="1.5"/>
+              <circle cx="33" cy="14" r="5" fill="#69b1ff" stroke="#4a9eff" stroke-width="1"/>
+            </svg>
+          </div>
+          <div class="home-card-title">内容优化</div>
+          <div class="home-card-desc">选中文本后进行智能改写</div>
+        </div>
+
+        <div class="home-card" @click="navigateTo('aiimage')">
+          <div class="home-card-icon">
+            <svg viewBox="0 0 48 48" width="36" height="36" fill="none">
+              <ellipse cx="24" cy="28" rx="16" ry="12" fill="#ffd6e7" stroke="#ff85c0" stroke-width="1.5"/>
+              <circle cx="18" cy="26" r="3" fill="#ff85c0"/>
+              <circle cx="28" cy="24" r="4" fill="#ffadd2"/>
+              <circle cx="24" cy="30" r="2.5" fill="#ff85c0"/>
+              <path d="M20 15l3-5 3 5 5-2-1 6h-14l-1-6 5 2z" fill="#ffadd2" stroke="#ff85c0" stroke-width="1"/>
+            </svg>
+          </div>
+          <div class="home-card-title">AI生图</div>
+          <div class="home-card-desc">AI生成图片素材</div>
+        </div>
+
+        <div class="home-card" @click="navigateTo('layout')">
+          <div class="home-card-icon">
+            <svg viewBox="0 0 48 48" width="36" height="36" fill="none">
+              <path d="M8 38V10l16 14L40 10v28H8z" fill="#e8e8e8" stroke="#bbb" stroke-width="1.5" stroke-linejoin="round"/>
+              <line x1="8" y1="38" x2="40" y2="38" stroke="#aaa" stroke-width="2"/>
+              <line x1="24" y1="24" x2="24" y2="38" stroke="#ccc" stroke-width="1" stroke-dasharray="3 2"/>
+            </svg>
+          </div>
+          <div class="home-card-title">排版优化</div>
+          <div class="home-card-desc">统一格式，美化布局</div>
+        </div>
       </div>
-    </Transition>
+    </template>
+
+    <!-- ===== 素材库页面列表 ===== -->
+    <template v-if="homeTab === 'material'">
+      <!-- 模板页面 -->
+      <div v-if="currentPage === 'template'" class="sub-page">
+        <div class="page-header">
+          <el-button :icon="ArrowLeft" text @click="currentPage = 'home'" />
+          <span class="page-title">模板库</span>
+        </div>
+        <div class="page-body">
+          <el-row :gutter="12">
+            <el-col :span="12" v-for="tpl in templates" :key="tpl.id">
+              <el-card
+                shadow="hover"
+                class="template-card"
+                :body-style="{ padding: '0', cursor: 'pointer' }"
+                @click="handleApplyTemplate(tpl)"
+              >
+                <div class="template-thumb" :style="{ background: tpl.color }"></div>
+                <div class="template-name">{{ tpl.name }}</div>
+              </el-card>
+            </el-col>
+          </el-row>
+        </div>
+      </div>
+
+      <!-- 图片页面 -->
+      <div v-else-if="currentPage === 'images'" class="sub-page">
+        <div class="page-header">
+          <el-button :icon="ArrowLeft" text @click="currentPage = 'home'" />
+          <span class="page-title">图片素材</span>
+        </div>
+        <div class="page-body">
+          <p class="info-text">浏览并选择图片插入到当前幻灯片中</p>
+          <el-row :gutter="10">
+            <el-col :span="8" v-for="n in 6" :key="n">
+              <el-card shadow="hover" class="image-placeholder-card" :body-style="{ padding: '0' }">
+                <div class="image-placeholder">
+                  <el-icon :size="28"><Picture /></el-icon>
+                  <span>图片 {{ n }}</span>
+                </div>
+              </el-card>
+            </el-col>
+          </el-row>
+        </div>
+      </div>
+
+      <!-- 图标页面 -->
+      <div v-else-if="currentPage === 'icons'" class="sub-page">
+        <div class="page-header">
+          <el-button :icon="ArrowLeft" text @click="currentPage = 'home'" />
+          <span class="page-title">图标素材</span>
+        </div>
+        <div class="page-body">
+          <el-row :gutter="10">
+            <el-col :span="6" v-for="(icon, idx) in iconList" :key="idx">
+              <el-card
+                shadow="hover"
+                class="icon-item-card"
+                :body-style="{ padding: '0', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }"
+                @click="handleInsertIcon(icon)"
+              >
+                <span class="icon-char">{{ icon.char }}</span>
+                <span class="icon-name">{{ icon.name }}</span>
+              </el-card>
+            </el-col>
+          </el-row>
+        </div>
+      </div>
+
+      <!-- 首页（素材库卡片） -->
+      <div v-else class="main-panel home-content">
+        <div class="home-card" @click="navigateTo('template')">
+          <div class="home-card-icon">
+            <el-icon :size="32" color="#667eea"><Document /></el-icon>
+          </div>
+          <div class="home-card-title">模板库</div>
+          <div class="home-card-desc">选择精美模板快速套用</div>
+        </div>
+
+        <div class="home-card" @click="navigateTo('images')">
+          <div class="home-card-icon">
+            <el-icon :size="32" color="#11998e"><Picture /></el-icon>
+          </div>
+          <div class="home-card-title">图片素材</div>
+          <div class="home-card-desc">浏览并插入图片到幻灯片</div>
+        </div>
+
+        <div class="home-card" @click="navigateTo('icons')">
+          <div class="home-card-icon">
+            <el-icon :size="32" color="#f2994a"><Connection /></el-icon>
+          </div>
+          <div class="home-card-title">图标素材</div>
+          <div class="home-card-desc">插入矢量图标装饰内容</div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { ArrowLeft, Picture, Document, Connection } from '@element-plus/icons-vue'
 import GeneratePPT from './GeneratePPT.vue'
 import OptimizeContent from './OptimizeContent.vue'
 import { generateOutline, applyOutlineToPowerPoint, isOfficeContext } from '../modules/powerpoint-api'
 
-// 页面状态：'home' | 'generate' | 'optimize' | 'aiimage' | 'layout' | 'template' | 'images' | 'icons'
-const currentPage = ref<'home'>('home')
-const currentNav = ref('')
+// 页面状态
+type PageType = 'home' | 'generate' | 'optimize' | 'aiimage' | 'layout' | 'template' | 'images' | 'icons'
+const currentPage = ref<PageType>('home')
+const currentNav = ref<PageType | ''>('')
+const homeTab = ref<'ai' | 'material'>('ai')
 
-// 从 URL 参数读取初始页面（Office Add-in 按钮点击时 URL 带 ?action=xxx）
+// 从 URL 参数读取初始页面
 function getInitialPageFromUrl(): string {
   try {
     const params = new URLSearchParams(window.location.search)
@@ -257,14 +278,14 @@ function getInitialPageFromUrl(): string {
   return 'home'
 }
 
-// 初始化时根据 URL 参数跳转
 onMounted(() => {
   const initialPage = getInitialPageFromUrl()
   if (initialPage !== 'home') {
-    currentPage.value = initialPage as any
-    currentNav.value = initialPage
+    currentPage.value = initialPage as PageType
+    currentNav.value = initialPage as PageType
   }
 })
+
 const generatePPTRef = ref<InstanceType<typeof GeneratePPT> | null>(null)
 const optimizeContentRef = ref<InstanceType<typeof OptimizeContent> | null>(null)
 
@@ -273,29 +294,15 @@ const aiImagePrompt = ref('')
 const aiImageLoading = ref(false)
 const aiImageResult = ref('')
 const layoutLoading = ref(false)
-
-// Toast
-const toast = reactive({
-  show: false,
-  message: '',
-  type: 'info' as 'success' | 'error' | 'info'
-})
-
-function showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
-  toast.message = message
-  toast.type = type
-  toast.show = true
-  setTimeout(() => { toast.show = false }, 3000)
-}
+const showImageOnLeft = ref(false)
 
 // 导航
-function navigateTo(page: typeof currentPage.value) {
+function navigateTo(page: PageType) {
   currentPage.value = page
   currentNav.value = page
 }
 
 // ===== 数据 =====
-
 const templates = [
   { id: 1, name: '商务蓝', color: 'linear-gradient(135deg, #667eea, #764ba2)' },
   { id: 2, name: '简约白', color: 'linear-gradient(135deg, #f5f7fa, #c3cfe2)' },
@@ -313,29 +320,23 @@ const iconList = [
 ]
 
 // ===== 功能处理 =====
-
 async function handleGenerateOutline(data: {
-  createType: string
-  prompt: string
-  pageCount: string
-  language: string
-  model: string
-  images: string[]
+  createType: string; prompt: string; pageCount: string; language: string; model: string; images: string[]
 }) {
   try {
     const pageCount = data.pageCount ? parseInt(data.pageCount) : undefined
     const outline = generateOutline(data.prompt, pageCount, data.language)
 
     if (isOfficeContext()) {
-      showToast('正在写入 PowerPoint...', 'info')
+      ElMessage.info('正在写入 PowerPoint...')
       const result = await applyOutlineToPowerPoint(outline)
-      showToast(result.message, result.success ? 'success' : 'error')
+      ElMessage({ message: result.message, type: result.success ? 'success' : 'error' })
     } else {
-      showToast(`已生成 ${outline.length} 页大纲`, 'info')
+      ElMessage.info(`已生成 ${outline.length} 页大纲`)
     }
     currentPage.value = 'home'
   } catch (e) {
-    showToast('生成失败: ' + (e as Error).message, 'error')
+    ElMessage.error('生成失败: ' + (e as Error).message)
   } finally {
     generatePPTRef.value?.setLoading(false)
   }
@@ -344,7 +345,7 @@ async function handleGenerateOutline(data: {
 async function handleReplaceText(data: { original: string; optimized: string }) {
   try {
     if (!isOfficeContext()) {
-      showToast('非 Office 环境，无法替换', 'info')
+      ElMessage.info('非 Office 环境，无法替换')
       return
     }
 
@@ -376,225 +377,246 @@ async function handleReplaceText(data: { original: string; optimized: string }) 
           }
         }
       })
-      showToast(replaced ? '已替换到幻灯片' : '未找到匹配文本', replaced ? 'success' : 'info')
+      ElMessage({ message: replaced ? '已替换到幻灯片' : '未找到匹配文本', type: replaced ? 'success' : 'info' })
     } else {
-      showToast('请先选中包含要替换文本的文本框', 'info')
+      ElMessage.info('请先选中包含要替换文本的文本框')
     }
   } catch (e) {
-    showToast('替换失败: ' + (e as Error).message, 'error')
+    ElMessage.error('替换失败: ' + (e as Error).message)
   } finally {
     optimizeContentRef.value?.setReplacing(false)
   }
 }
 
 function handleAIImageGenerate() {
-  if (!aiImagePrompt.value.trim()) return
   aiImageLoading.value = true
-  showToast('正在生成图片...', 'info')
-  // TODO: 接入 AI 生图 API
+  ElMessage.info('正在生成图片...')
+  console.log('开始生成图片，prompt:', aiImagePrompt.value)
+  
+  // 使用 text-to-image API 生成图片
   setTimeout(() => {
+    // 生成图片 URL
+    const prompt = encodeURIComponent(aiImagePrompt.value.trim() || '一只可爱的小猫')
+    const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${prompt}&image_size=landscape_16_9`
+    console.log('生成的图片URL:', imageUrl)
+    aiImageResult.value = imageUrl
+    console.log('aiImageResult:', aiImageResult.value)
+    console.log('showImageOnLeft:', showImageOnLeft.value)
     aiImageLoading.value = false
-    showToast('图片生成完成！', 'success')
+    ElMessage.success('图片生成完成！')
   }, 2000)
 }
 
 function handleLayoutOptimize() {
   layoutLoading.value = true
-  showToast('正在优化排版...', 'info')
+  ElMessage.info('正在优化排版...')
   setTimeout(() => {
     layoutLoading.value = false
-    showToast('排版优化完成！', 'success')
+    ElMessage.success('排版优化完成！')
   }, 2000)
 }
 
 function handleApplyTemplate(tpl: { id: number; name: string }) {
-  showToast(`正在应用模板: ${tpl.name}`, 'info')
+  ElMessage.info(`正在应用模板: ${tpl.name}`)
 }
 
 function handleInsertIcon(icon: { char: string; name: string }) {
-  showToast(`已选择图标: ${icon.name}`, 'info')
+  ElMessage.info(`已选择图标: ${icon.name}`)
+}
+
+// 插入图片到PowerPoint
+async function insertImageToPowerPoint() {
+  if (!aiImageResult.value) return
+  
+  try {
+    const Office = (globalThis as any).Office
+    if (!Office?.context?.document) {
+      ElMessage.error('当前不在 Office 环境中')
+      return
+    }
+    
+    ElMessage.info('正在插入图片到 PowerPoint...')
+    
+    // 检查PowerPoint API版本
+    const supports14 = !!Office.context.requirements?.isSetSupported?.('PowerPointApi', '1.4')
+    
+    if (supports14) {
+      // 使用PowerPoint 1.4+ API
+      await insertImageViaPowerPointApi(aiImageResult.value)
+    } else {
+      // 使用Common API
+      await insertImageViaCommonApi(aiImageResult.value)
+    }
+    
+    ElMessage.success('图片已插入到 PowerPoint')
+  } catch (error) {
+    console.error('插入图片失败:', error)
+    ElMessage.error('插入图片失败: ' + (error as Error).message)
+  }
+}
+
+// 使用PowerPoint 1.4+ API插入图片
+async function insertImageViaPowerPointApi(imageUrl: string) {
+  const PowerPoint = (globalThis as any).Office.PowerPoint || (globalThis as any).PowerPoint
+  
+  await PowerPoint.run(async (context: any) => {
+    const slides = context.presentation.slides
+    slides.load('items')
+    await context.sync()
+    
+    if (slides.items.length === 0) {
+      context.presentation.slides.add()
+      await context.sync()
+      slides.load('items')
+      await context.sync()
+    }
+    
+    const currentSlide = slides.items[0] // 插入到第一张幻灯片
+    currentSlide.shapes.addPictureFromBase64(
+      await imageToBase64(imageUrl),
+      Office.Core.SlideLayoutType.Title,
+      100, // 左边距
+      100, // 上边距
+      400, // 宽度
+      300  // 高度
+    )
+    
+    await context.sync()
+  })
+}
+
+// 使用Common API插入图片
+async function insertImageViaCommonApi(imageUrl: string) {
+  const Office = (globalThis as any).Office
+  
+  return new Promise((resolve, reject) => {
+    Office.context.document.setSelectedDataAsync(
+      imageUrl,
+      { coercionType: Office.CoercionType.Image },
+      (result: any) => {
+        if (result.status === Office.AsyncResultStatus.Succeeded) {
+          resolve(null)
+        } else {
+          reject(new Error(result.error?.message || '插入图片失败'))
+        }
+      }
+    )
+  })
+}
+
+// 将图片URL转换为Base64
+function imageToBase64(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.onload = function() {
+      const reader = new FileReader()
+      reader.onloadend = function() {
+        const base64 = (reader.result as string).split(',')[1] // 去掉data:image/xxx;base64,前缀
+        resolve(base64)
+      }
+      reader.readAsDataURL(xhr.response)
+    }
+    xhr.onerror = function() {
+      reject(new Error('获取图片失败'))
+    }
+    xhr.open('GET', url, true)
+    xhr.responseType = 'blob'
+    xhr.send()
+  })
 }
 </script>
 
 <style scoped>
-/* ========== 布局 ========== */
 .taskpane-root {
-  height: 100vh;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   background: #fff;
-  color: #333;
-  font-family: 'Segoe UI', 'Microsoft YaHei', -apple-system, sans-serif;
+}
+
+/* ========== 全局Tab栏（始终置顶） ========== */
+.global-tabs {
+  display: flex;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+  background: #fff;
+}
+
+.home-tab {
+  flex: 1;
+  padding: 12px 0;
+  font-size: 14.5px;
+  color: #999;
+  cursor: pointer;
+  position: relative;
+  font-weight: 500;
+  text-align: center;
+}
+
+.home-tab:hover { color: #666; }
+
+.home-tab.active {
+  color: #1890ff;
+  font-weight: 600;
+}
+
+.home-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 10%;
+  right: 10%;
+  height: 2.5px;
+  background: #1890ff;
+  border-radius: 2px;
+}
+
+/* 内容区 */
+.home-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
 }
 
 .main-panel {
   display: flex;
-  height: 100vh;
+  flex-direction: column;
+  background: #fff;
 }
 
-/* ========== 侧边栏 ========== */
-.sidebar {
-  width: 180px;
-  flex-shrink: 0;
-  background: linear-gradient(180deg, #f8faff 0%, #eff3ff 100%);
-  border-right: 1px solid #e4e9f2;
+.home-card {
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-}
-
-.sidebar-header {
-  padding: 16px 14px 12px;
-}
-
-.logo-text {
-  font-size: 17px;
-  font-weight: 700;
-  color: #4a6cf7;
-  letter-spacing: 0.5px;
-}
-
-.nav-group-label {
-  padding: 14px 14px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #aab0c0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.nav-item {
-  display: flex;
   align-items: center;
+  padding: 12px 0;
   gap: 10px;
-  width: 100%;
-  padding: 10px 14px;
-  border: none;
-  background: transparent;
   cursor: pointer;
-  font-size: 13.5px;
-  color: #555d7a;
-  font-family: inherit;
-  transition: all 0.15s ease;
-  text-align: left;
-  border-radius: 0;
-}
-
-.nav-item:hover {
-  background: rgba(74, 108, 247, 0.08);
-  color: #4a6cf7;
-}
-
-.nav-item.active {
-  background: rgba(74, 108, 247, 0.1);
-  color: #4a6cf7;
-  font-weight: 600;
-}
-
-.nav-icon {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.nav-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.icon-generate { color: #f56c6c; }
-.icon-image { color: #e6a23c; }
-.icon-optimize { color: #67c23a; }
-.icon-layout { color: #409eff; }
-.icon-template { color: #9b59b6; }
-.icon-pictures { color: #17a2b8; }
-.icon-icons { color: #e67e22; }
-
-/* ========== 内容区 ========== */
-.content-area {
-  flex: 1;
-  overflow-y: auto;
-  background: #ffffff;
-}
-
-.welcome-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 24px;
-  min-height: 100%;
-}
-
-.welcome-logo {
-  margin-bottom: 12px;
-}
-
-.welcome-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-.welcome-desc {
-  font-size: 13px;
-  color: #999;
-  margin-bottom: 32px;
-}
-
-.quick-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  max-width: 320px;
-  width: 100%;
-}
-
-.quick-action-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 18px 12px;
-  border: 1px solid #eef0f4;
+  border: 1.5px solid #f0f0f0;
   border-radius: 12px;
-  background: #fafbfe;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 13px;
-  font-weight: 500;
-  color: #555;
-  font-family: inherit;
+  margin: 8px 16px;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.quick-action-card:hover {
-  border-color: #d8def0;
-  background: #f0f3fa;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-}
+.home-card:hover { background: #fafafa; border-color: #e0e0e0; }
 
-.quick-icon {
-  width: 36px;
-  height: 36px;
+.home-card-icon {
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
 }
 
-.quick-icon svg {
-  width: 20px;
-  height: 20px;
+.home-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
 }
 
-.quick-icon.icon-generate { background: rgba(245, 108, 108, 0.1); color: #f56c6c; }
-.quick-icon.icon-image { background: rgba(230, 162, 60, 0.1); color: #e6a23c; }
-.quick-icon.icon-optimize { background: rgba(103, 194, 58, 0.1); color: #67c23a; }
-.quick-icon.icon-layout { background: rgba(64, 158, 255, 0.1); color: #409eff; }
+.home-card-desc {
+  font-size: 13px;
+  color: #aaa;
+}
 
 /* ========== 子页面 ========== */
 .sub-page {
@@ -612,22 +634,6 @@ function handleInsertIcon(icon: { char: string; name: string }) {
   border-bottom: 1px solid #eee;
   flex-shrink: 0;
 }
-
-.back-btn {
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: #f5f5f5;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
-}
-
-.back-btn:hover { background: #eee; }
-.back-btn svg { width: 16px; height: 16px; color: #555; }
 
 .page-title {
   font-size: 15px;
@@ -658,59 +664,40 @@ function handleInsertIcon(icon: { char: string; name: string }) {
   margin-bottom: 8px;
 }
 
-.form-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 13px;
-  font-family: inherit;
-  resize: vertical;
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.form-textarea:focus { border-color: #4a6cf7; }
-
-.primary-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 24px;
-  background: #4a6cf7;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.15s;
-  font-family: inherit;
-  margin-top: 12px;
-}
-
-.primary-btn:hover { opacity: 0.9; }
-.primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
 .result-section { margin-top: 20px; }
-.result-image { max-width: 100%; border-radius: 8px; border: 1px solid #eee; }
+.result-image { max-width: 100%; border-radius: 8px; border: 1px solid #eee; cursor: pointer; }
 
-/* ========== 模板网格 ========== */
-.template-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+.ai-image-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
+.ai-image-container.image-on-left {
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.left-image {
+  flex: 0 0 30%;
+  max-width: 30%;
+}
+
+.left-image .result-image {
+  width: 100%;
+  height: auto;
+}
+
+.form-section.with-left-image {
+  flex: 1;
+  margin-left: 20px;
+}
+
+/* 模板卡片 */
 .template-card {
-  cursor: pointer;
+  margin-bottom: 12px;
   border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid #eef0f4;
-  transition: all 0.2s;
 }
-
-.template-card:hover { border-color: #d0d5e0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
 
 .template-thumb { height: 90px; }
 .template-name {
@@ -722,11 +709,10 @@ function handleInsertIcon(icon: { char: string; name: string }) {
   font-weight: 500;
 }
 
-/* ========== 图片网格 ========== */
-.image-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+/* 图片占位 */
+.image-placeholder-card {
+  border-radius: 10px;
+  margin-bottom: 10px;
 }
 
 .image-placeholder {
@@ -737,60 +723,23 @@ function handleInsertIcon(icon: { char: string; name: string }) {
   justify-content: center;
   gap: 6px;
   background: #f5f7fa;
-  border: 1px solid #eef0f4;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 11px;
   color: #aaa;
-}
-
-.image-placeholder:hover { border-color: #4a6cf7; background: #f0f3ff; }
-.image-placeholder svg { width: 28px; height: 28px; color: #ccc; }
-
-/* ========== 图标网格 ========== */
-.icon-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-
-.icon-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 12px 4px;
-  background: #f8f9fc;
-  border: 1px solid #eef0f4;
-  border-radius: 10px;
+  font-size: 11px;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
-.icon-item:hover { background: #eef1f8; transform: scale(1.05); border-color: #d0d5e0; }
+/* 图标项 */
+.icon-item-card {
+  border-radius: 10px;
+  margin-bottom: 10px;
+  aspect-ratio: 1;
+}
+
+.icon-item-card :deep(.el-card__body) {
+  padding: 12px 4px !important;
+  background: #f8f9fc;
+}
 
 .icon-char { font-size: 24px; line-height: 1; }
 .icon-name { font-size: 11px; color: #777; }
-
-/* ========== Toast ========== */
-.taskpane-toast {
-  position: fixed;
-  bottom: 16px;
-  left: 16px;
-  right: 16px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  text-align: center;
-  z-index: 100;
-}
-
-.taskpane-toast.info { background: #ecf5ff; color: #409eff; border: 1px solid #d9ecff; }
-.taskpane-toast.success { background: #f0f9eb; color: #67c23a; border: 1px solid #e1f3d8; }
-.taskpane-toast.error { background: #fef0f0; color: #f56c6c; border: 1px solid #fde2e2; }
-
-.toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
-.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(10px); }
 </style>

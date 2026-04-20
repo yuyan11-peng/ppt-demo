@@ -2,38 +2,65 @@
   <header class="header-bar">
     <div class="header-left">
       <div class="logo">
-        <span class="logo-icon">◈</span>
+        <el-icon :size="22" color="var(--color-primary)"><Monitor /></el-icon>
         <span class="logo-text">PPT Kit</span>
       </div>
-      <div class="divider"></div>
+      <el-divider direction="vertical" />
       <span class="presentation-name">{{ presentationName }}</span>
-      <span class="slide-badge">{{ slideCount }} 张幻灯片</span>
+      <el-tag size="small" type="primary" effect="plain">{{ slideCount }} 张幻灯片</el-tag>
     </div>
+
     <div class="header-right">
       <!-- MCP Bridge 连接状态 -->
-      <div class="bridge-status" @click="$emit('toggle-bridge')" :title="bridgeTooltip">
-        <span class="status-dot" :class="connectionState"></span>
-        <span class="status-text">{{ bridgeLabel }}</span>
-        <span v-if="connectionState === 'connected' && requestCount > 0" class="request-badge">
-          {{ requestCount }}
-        </span>
-      </div>
-      <div class="divider"></div>
+      <el-tooltip :content="bridgeTooltip" placement="bottom" :disabled="false">
+        <div class="bridge-status" @click="$emit('toggle-bridge')">
+          <el-badge v-if="connectionState === 'connected' && requestCount > 0" :value="requestCount" :max="99">
+            <el-tag
+              :type="statusTagType"
+              :effect="'plain'"
+              size="default"
+              round
+              class="bridge-tag"
+            >
+              {{ bridgeLabel }}
+            </el-tag>
+          </el-badge>
+          <el-tag
+            v-else
+            :type="statusTagType"
+            :effect="'plain'"
+            size="default"
+            round
+            class="bridge-tag"
+          >
+            {{ bridgeLabel }}
+          </el-tag>
+        </div>
+      </el-tooltip>
+
+      <el-divider direction="vertical" />
+
       <!-- 同步到 PowerPoint（仅在 Office 环境中显示） -->
-      <button v-if="inOffice" class="btn btn-primary" @click="$emit('sync-ppt')" title="同步到当前 PowerPoint 演示文稿">
-        <span class="btn-icon">⊕</span>
+      <el-button
+        v-if="inOffice"
+        type="primary"
+        size="small"
+        @click="$emit('sync-ppt')"
+      >
+        <template #icon><Connection /></template>
         同步到 PPT
-      </button>
-      <button class="btn btn-ghost" @click="$emit('export-pptx')" title="导出 PPTX">
-        <span class="btn-icon">⬇</span>
+      </el-button>
+      <el-button size="small" @click="$emit('export-pptx')">
+        <template #icon><Download /></template>
         导出 PPTX
-      </button>
+      </el-button>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Monitor, Connection, Download } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   presentationName: string
@@ -55,6 +82,15 @@ const bridgeLabel = computed(() => {
     case 'connecting': return '连接中...'
     case 'error': return 'MCP 连接错误'
     default: return 'MCP 未连接'
+  }
+})
+
+const statusTagType = computed<'success' | 'warning' | 'danger' | 'info'>(() => {
+  switch (props.connectionState) {
+    case 'connected': return 'success'
+    case 'connecting': return 'warning'
+    case 'error': return 'danger'
+    default: return 'info'
   }
 })
 
@@ -92,11 +128,6 @@ const bridgeTooltip = computed(() => {
   gap: 8px;
 }
 
-.logo-icon {
-  font-size: 22px;
-  color: var(--color-primary);
-}
-
 .logo-text {
   font-size: 16px;
   font-weight: 700;
@@ -104,24 +135,9 @@ const bridgeTooltip = computed(() => {
   letter-spacing: -0.3px;
 }
 
-.divider {
-  width: 1px;
-  height: 20px;
-  background: var(--color-border);
-}
-
 .presentation-name {
   font-size: 13px;
   color: var(--color-text-secondary);
-}
-
-.slide-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: rgba(108, 122, 224, 0.12);
-  color: var(--color-primary);
-  font-weight: 500;
 }
 
 .header-right {
@@ -134,109 +150,18 @@ const bridgeTooltip = computed(() => {
 .bridge-status {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
   cursor: pointer;
-  transition: var(--transition);
+  transition: all 0.2s;
   user-select: none;
 }
 
-.bridge-status:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-primary);
+.bridge-status:hover .bridge-tag {
+  opacity: 1;
+  transform: scale(1.02);
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  transition: background 0.3s ease;
-}
-
-.status-dot.connected {
-  background: var(--color-success);
-  box-shadow: 0 0 6px rgba(76, 175, 80, 0.5);
-}
-
-.status-dot.connecting {
-  background: var(--color-warning);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.status-dot.error {
-  background: var(--color-danger);
-  box-shadow: 0 0 6px rgba(224, 92, 108, 0.4);
-}
-
-.status-dot.disconnected {
-  background: var(--color-text-dim);
-}
-
-.status-text {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.request-badge {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: rgba(76, 175, 80, 0.15);
-  color: var(--color-success);
-  font-weight: 600;
-  min-width: 18px;
-  text-align: center;
-}
-
-.btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 500;
+.bridge-tag {
   cursor: pointer;
-  border: none;
-  transition: var(--transition);
-  font-family: inherit;
-}
-
-.btn-ghost {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-}
-
-.btn-ghost:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: #fff;
-  border: 1px solid var(--color-primary);
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
-}
-
-.btn-icon {
-  font-size: 14px;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  transition: all 0.2s;
 }
 </style>

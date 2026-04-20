@@ -6,11 +6,11 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
 
-  <Id>12345678-1234-1234-1234-123456789abc</Id>
-  <Version>1.0.0.14</Version>
+  <Id>a1b2c3d4-e5f6-7890-abcd-ef1234567890</Id>
+  <Version>1.2.0.4</Version>
   <ProviderName>办公帮帮</ProviderName>
   <DefaultLocale>zh-CN</DefaultLocale>
-  <DisplayName DefaultValue="办公帮帮 - AI 智能助手" />
+  <DisplayName DefaultValue="办公帮帮" />
   <Description DefaultValue="基于 Vue3 和 AI 的智能演示文稿工具，支持一键生成PPT、AI生图、内容优化、排版优化等功能" />
   <IconUrl DefaultValue="https://localhost:8989/icons/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:8989/icons/icon-80.png" />
@@ -44,13 +44,13 @@
             <CustomTab id="BangBangTab">
               <Label resid="TabLabel" />
 
-              <!-- AI 助手组 -->
-              <Group id="AiAssistantGroup">
+              <!-- AI 助手功能区 -->
+              <Group id="MainEntryGroup">
                 <Label resid="AiGroup.Label" />
                 <Icon>
-                  <bt:Image size="16" resid="Icon.Generate.16" />
-                  <bt:Image size="32" resid="Icon.Generate.32" />
-                  <bt:Image size="80" resid="Icon.Generate.80" />
+                  <bt:Image size="16" resid="Icon.Main.16" />
+                  <bt:Image size="32" resid="Icon.Main.32" />
+                  <bt:Image size="80" resid="Icon.Main.80" />
                 </Icon>
 
                 <Control xsi:type="Button" id="BtnGeneratePPT">
@@ -216,7 +216,11 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <!-- 组/应用图标 -->
+        <!-- 主入口大按钮图标 -->
+        <bt:Image id="Icon.Main.16" DefaultValue="https://localhost:8989/icons/icon-16.png" />
+        <bt:Image id="Icon.Main.32" DefaultValue="https://localhost:8989/icons/icon-32.png" />
+        <bt:Image id="Icon.Main.80" DefaultValue="https://localhost:8989/icons/icon-80.png" />
+        <!-- AI 助手功能图标 -->
         <bt:Image id="Icon.Generate.16" DefaultValue="https://localhost:8989/icons/generate-16.png" />
         <bt:Image id="Icon.Generate.32" DefaultValue="https://localhost:8989/icons/generate-32.png" />
         <bt:Image id="Icon.Generate.80" DefaultValue="https://localhost:8989/icons/generate-80.png" />
@@ -256,9 +260,11 @@
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="办公帮帮已就绪" />
         <bt:String id="TabLabel" DefaultValue="办公帮帮" />
-        <bt:String id="AiGroup.Label" DefaultValue="AI助手" />
-        <bt:String id="MaterialGroup.Label" DefaultValue="素材库" />
-        <bt:String id="SidebarGroup.Label" DefaultValue=" " />
+        <bt:String id="MainGroup.Label" DefaultValue="办公帮帮" />
+        <bt:String id="BtnMain.Label" DefaultValue="助手面板" />
+        <bt:String id="AiGroup.Label" DefaultValue="AI 助手" />
+        <bt:String id="MaterialGroup.Label" DefaultValue="素 材 库" />
+        <bt:String id="SidebarGroup.Label" DefaultValue="侧边栏" />
         <bt:String id="BtnGenerate.Label" DefaultValue="一键生成PPT" />
         <bt:String id="BtnAIImage.Label" DefaultValue="AI生图" />
         <bt:String id="BtnOptimizeContent.Label" DefaultValue="内容优化" />
@@ -270,6 +276,7 @@
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="点击办公帮帮按钮打开 AI 智能助手面板。" />
+        <bt:String id="BtnMain.Tooltip" DefaultValue="打开办公帮帮完整功能面板，使用 AI 生成 PPT、生图、优化内容等" />
         <bt:String id="BtnGenerate.Tooltip" DefaultValue="输入主题，AI 帮您快速生成完整演示文稿" />
         <bt:String id="BtnAIImage.Tooltip" DefaultValue="AI 生成图片素材" />
         <bt:String id="BtnOptimizeContent.Tooltip" DefaultValue="选中文本后进行智能改写和内容优化" />

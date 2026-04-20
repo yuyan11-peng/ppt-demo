@@ -2,12 +2,7 @@
   <div class="optimize-content">
     <!-- 顶部导航 -->
     <div class="nav-header">
-      <button class="back-btn" @click="$emit('back')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
-        返回
-      </button>
+      <el-button :icon="ArrowLeft" text @click="$emit('back')">返回</el-button>
       <span class="nav-title">内容优化</span>
     </div>
 
@@ -16,74 +11,74 @@
       <!-- 优化类型 -->
       <div class="form-section">
         <div class="section-header">
-          <span class="section-icon">📝</span>
+          <el-icon :size="16" color="#409eff"><EditPen /></el-icon>
           <span class="section-title">优化类型</span>
         </div>
-        <div class="select-wrapper">
-          <select v-model="optimizeType" class="form-select">
-            <option value="rewrite">重写</option>
-            <option value="polish">润色</option>
-            <option value="expand">扩写</option>
-            <option value="simplify">精简</option>
-            <option value="formal">正式化</option>
-            <option value="creative">创意化</option>
-          </select>
-          <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </div>
+        <el-select v-model="optimizeType" placeholder="请选择优化类型" style="width: 100%;">
+          <el-option label="重写" value="rewrite" />
+          <el-option label="润色" value="polish" />
+          <el-option label="扩写" value="expand" />
+          <el-option label="精简" value="simplify" />
+          <el-option label="正式化" value="formal" />
+          <el-option label="创意化" value="creative" />
+        </el-select>
       </div>
 
       <!-- 输入文本 -->
       <div class="form-section">
         <label class="input-label">输入要优化的文本</label>
-        <textarea
+        <el-input
           v-model="inputText"
-          class="text-input"
+          type="textarea"
           placeholder="这是我的标题xxx"
-          rows="5"
-        ></textarea>
+          :rows="5"
+          resize="vertical"
+        />
       </div>
 
       <!-- 开始优化按钮 -->
-      <button
-        class="optimize-btn"
-        :disabled="!inputText.trim() || loading"
+      <el-button
+        type="primary"
+        :loading="loading"
+        :disabled="!inputText.trim()"
         @click="handleOptimize"
+        style="width: 100%; margin-bottom: 20px;"
       >
-        <span v-if="loading" class="loading-spinner"></span>
         {{ loading ? '优化中...' : '开始优化' }}
-      </button>
+      </el-button>
 
       <!-- 优化结果 -->
-      <div v-if="result" class="result-section">
-        <div class="result-header">
-          <span class="result-title">优化结果</span>
-          <button class="copy-btn" @click="handleCopy" :title="copied ? '已复制' : '复制'">
-            <svg v-if="!copied" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-            </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M20 6L9 17l-5-5" />
-            </svg>
-          </button>
-        </div>
+      <el-card v-if="result" shadow="never" class="result-card">
+        <template #header>
+          <div class="result-header">
+            <span class="result-title">优化结果</span>
+            <el-tooltip :content="copied ? '已复制' : '复制'" placement="top">
+              <el-button
+                :icon="copied ? Check : CopyDocument"
+                text
+                size="small"
+                @click="handleCopy"
+              />
+            </el-tooltip>
+          </div>
+        </template>
         <div class="result-content">{{ result }}</div>
-        <button
-          class="replace-btn"
-          @click="handleReplace"
+        <el-button
+          :loading="replacing"
           :disabled="replacing"
+          @click="handleReplace"
+          style="width: 100%; margin-top: 12px;"
         >
-          {{ replacing ? '替换中...' : '替换' }}
-        </button>
-      </div>
+          {{ replacing ? '替换中...' : '应用到 PPT' }}
+        </el-button>
+      </el-card>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { ArrowLeft, EditPen, Check, CopyDocument } from '@element-plus/icons-vue'
 
 const emit = defineEmits<{
   back: []
@@ -132,7 +127,7 @@ async function handleOptimize() {
   result.value = ''
   copied.value = false
 
-  // 模拟 AI 优化延迟（后续接入 AI API）
+  // 模拟 AI 优化延迟
   await new Promise(resolve => setTimeout(resolve, 1000))
 
   result.value = simulateOptimize(inputText.value, optimizeType.value)
@@ -145,7 +140,6 @@ function handleCopy() {
     copied.value = true
     setTimeout(() => { copied.value = false }, 2000)
   }).catch(() => {
-    // fallback
     const textarea = document.createElement('textarea')
     textarea.value = result.value
     document.body.appendChild(textarea)
@@ -187,24 +181,6 @@ defineExpose({
   flex-shrink: 0;
 }
 
-.back-btn {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  background: none;
-  border: none;
-  color: #1890ff;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 4px 0;
-  font-family: inherit;
-  transition: color 0.2s;
-}
-
-.back-btn:hover {
-  color: #40a9ff;
-}
-
 .nav-title {
   font-size: 15px;
   font-weight: 600;
@@ -218,7 +194,6 @@ defineExpose({
   padding: 16px;
 }
 
-/* 表单分区 */
 .form-section {
   margin-bottom: 16px;
 }
@@ -230,51 +205,12 @@ defineExpose({
   margin-bottom: 10px;
 }
 
-.section-icon {
-  font-size: 16px;
-}
-
 .section-title {
   font-size: 14px;
   font-weight: 600;
   color: #333;
 }
 
-/* 下拉选择 */
-.select-wrapper {
-  position: relative;
-}
-
-.form-select {
-  width: 100%;
-  padding: 10px 36px 10px 12px;
-  border: 1.5px solid #e8e8e8;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #333;
-  outline: none;
-  appearance: none;
-  -webkit-appearance: none;
-  background: #fff;
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color 0.2s;
-}
-
-.form-select:focus {
-  border-color: #1890ff;
-}
-
-.select-arrow {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #999;
-  pointer-events: none;
-}
-
-/* 输入标签 */
 .input-label {
   display: block;
   font-size: 13px;
@@ -282,87 +218,15 @@ defineExpose({
   margin-bottom: 8px;
 }
 
-/* 文本输入 */
-.text-input {
-  width: 100%;
-  padding: 12px;
-  border: 1.5px solid #e8e8e8;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #333;
-  resize: vertical;
-  outline: none;
-  font-family: inherit;
-  line-height: 1.5;
-  transition: border-color 0.2s;
-  min-height: 100px;
-}
-
-.text-input::placeholder {
-  color: #bbb;
-}
-
-.text-input:focus {
-  border-color: #1890ff;
-}
-
-/* 优化按钮 */
-.optimize-btn {
-  width: 100%;
-  padding: 12px 0;
-  border: none;
-  border-radius: 8px;
-  background: #1890ff;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.optimize-btn:hover:not(:disabled) {
-  background: #40a9ff;
-}
-
-.optimize-btn:disabled {
-  background: #a0cfff;
-  cursor: not-allowed;
-}
-
-/* Loading spinner */
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* 优化结果 */
-.result-section {
-  border: 1.5px solid #e8e8e8;
+/* 结果卡片 */
+.result-card {
   border-radius: 10px;
-  overflow: hidden;
 }
 
 .result-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
-  background: #fafafa;
-  border-bottom: 1px solid #f0f0f0;
 }
 
 .result-title {
@@ -371,58 +235,10 @@ defineExpose({
   color: #333;
 }
 
-.copy-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid #e8e8e8;
-  border-radius: 6px;
-  background: #fff;
-  color: #666;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.copy-btn:hover {
-  border-color: #1890ff;
-  color: #1890ff;
-}
-
 .result-content {
-  padding: 14px;
   font-size: 14px;
   color: #333;
   line-height: 1.6;
   min-height: 60px;
-  background: #fff;
-}
-
-.replace-btn {
-  display: block;
-  width: calc(100% - 28px);
-  margin: 0 14px 14px;
-  padding: 10px 0;
-  border: 1.5px solid #e8e8e8;
-  border-radius: 8px;
-  background: #fafafa;
-  color: #666;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.2s;
-}
-
-.replace-btn:hover:not(:disabled) {
-  background: #f0f7ff;
-  border-color: #1890ff;
-  color: #1890ff;
-}
-
-.replace-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>

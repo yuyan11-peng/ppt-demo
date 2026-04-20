@@ -9,13 +9,16 @@
     "dev:https": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
+    "start:ppt": "npx office-addin-dev-settings sideload -a PowerPoint manifest-share/manifest.xml desktop",
     "certs:install": "node scripts/certs.mjs install",
     "certs:uninstall": "node scripts/certs.mjs uninstall",
     "certs:verify": "node scripts/certs.mjs verify"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "cors": "^2.8.5",
+    "element-plus": "^2.13.7",
     "express": "^4.21.2",
     "file-saver": "^2.0.5",
     "highlight.js": "^11.11.1",
