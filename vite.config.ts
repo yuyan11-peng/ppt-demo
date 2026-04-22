@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import VueRouter from 'unplugin-vue-router/vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import { mcpBridgePlugin } from './src/vite-plugin-mcp'
@@ -28,6 +29,11 @@ function getHttpsOptions() {
 
 export default defineConfig(({ command }) => ({
   plugins: [
+    VueRouter({
+      /* options */
+      routesFolder: 'src/pages',
+      dts: 'src/typed-router.d.ts',
+    }),
     vue(),
     mcpBridgePlugin()
   ],

@@ -26,6 +26,7 @@
     "mermaid": "^11.4.1",
     "pptxgenjs": "^3.12.0",
     "vue": "^3.5.13",
+    "vue-router": "^4.6.4",
     "ws": "^8.18.0",
     "zod": "^3.24.2"
   },
@@ -39,6 +40,7 @@
     "office-addin-dev-settings": "^3.0.7",
     "sharp": "^0.34.5",
     "typescript": "~5.7.2",
+    "unplugin-vue-router": "^0.19.2",
     "vite": "^6.2.4",
     "vue-tsc": "^2.2.8"
   }
