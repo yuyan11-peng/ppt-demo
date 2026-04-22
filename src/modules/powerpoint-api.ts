@@ -307,6 +307,91 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * 从当前 PowerPoint 演示文稿中读取所有幻灯片的标题和内容
+ * 返回与 store Slide 结构兼容的数据
+ */
+export async function fetchSlidesFromPowerPoint(): Promise<Array<{
+  id: string
+  title: string
+  markdown: string
+  layout: 'title' | 'content' | 'two-column' | 'code' | 'blank'
+}>> {
+  if (!isOfficeContext()) {
+    return []
+  }
+
+  const Office = (globalThis as any).Office
+  const supports14 = !!Office.context.requirements?.isSetSupported?.('PowerPointApi', '1.4')
+
+  if (!supports14) {
+    console.warn('[PowerPoint API] fetchSlidesFromPowerPoint 需要 PowerPointApi 1.4+')
+    return []
+  }
+
+  try {
+    const PowerPoint = Office.PowerPoint || (globalThis as any).PowerPoint
+    const result: Array<{
+      id: string
+      title: string
+      markdown: string
+      layout: 'title' | 'content' | 'two-column' | 'code' | 'blank'
+    }> = []
+
+    await PowerPoint.run(async (context: any) => {
+      const presentation = context.presentation
+      const slides = presentation.slides
+      slides.load('items')
+      await context.sync()
+
+      for (let i = 0; i < slides.items.length; i++) {
+        const slide = slides.items[i]
+        const shapes = slide.shapes
+        shapes.load('items')
+        await context.sync()
+
+        let slideTitle = ''
+        const bodyTexts: string[] = []
+
+        for (const shape of shapes.items) {
+          try {
+            shape.textFrame.load('textRange')
+            await context.sync()
+            const text = shape.textFrame.textRange.text || ''
+
+            if (!slideTitle && text.trim()) {
+              // 第一个有文本的形状作为标题
+              slideTitle = text.trim()
+            } else if (text.trim()) {
+              bodyTexts.push(text.trim())
+            }
+          } catch {
+            // 某些形状没有 textFrame，跳过
+          }
+        }
+
+        const layout: 'title' | 'content' = i === 0 ? 'title' : 'content'
+        const bullets = bodyTexts.map(t => `- ${t}`).join('\n')
+        const markdown = bodyTexts.length > 0
+          ? `# ${slideTitle}\n\n${bullets}`
+          : `# ${slideTitle || '幻灯片 ' + (i + 1)}`
+
+        result.push({
+          id: `ppt_slide_${i}_${Date.now()}`,
+          title: slideTitle || `幻灯片 ${i + 1}`,
+          markdown,
+          layout
+        })
+      }
+    })
+
+    return result
+  } catch (e) {
+    console.error('[PowerPoint API] 读取幻灯片失败:', e)
+    return []
+  }
+}
+
+/**
  * 将当前 PPT Kit 幻灯片内容写入 PowerPoint 演示文稿
  */
 export async function syncToPowerPoint(slides: Array<{

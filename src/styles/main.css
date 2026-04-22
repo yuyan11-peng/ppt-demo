@@ -75,7 +75,8 @@ body {
 }
 
 /* Code Highlighting Theme */
-.hljs {
+/* 仅在 markdown-preview 内应用大字号 hljs，缩略图内的 hljs 由各自组件控制 */
+.markdown-preview .hljs {
   background: var(--color-code-bg) !important;
   color: #e4e6f0 !important;
   padding: 16px !important;

@@ -12,6 +12,7 @@
       <GeneratePPT
         v-if="currentPage === 'generate'"
         ref="generatePPTRef"
+        class="generate-ppt-wrapper"
         @back="currentPage = 'home'"
         @generate="handleGenerateOutline"
       />
@@ -246,6 +247,9 @@ import { ArrowLeft, Picture, Document, Connection } from '@element-plus/icons-vu
 import GeneratePPT from './GeneratePPT.vue'
 import OptimizeContent from './OptimizeContent.vue'
 import { generateOutline, applyOutlineToPowerPoint, isOfficeContext } from '../modules/powerpoint-api'
+import { useStore } from '../store'
+
+const store = useStore()
 
 // 页面状态
 type PageType = 'home' | 'generate' | 'optimize' | 'aiimage' | 'layout' | 'template' | 'images' | 'icons'
@@ -326,6 +330,9 @@ async function handleGenerateOutline(data: {
   try {
     const pageCount = data.pageCount ? parseInt(data.pageCount) : undefined
     const outline = generateOutline(data.prompt, pageCount, data.language)
+
+    // 同步大纲数据到 store（localStorage），这样新窗口可以读取
+    store.importFromOutline(outline, data.prompt)
 
     if (isOfficeContext()) {
       ElMessage.info('正在写入 PowerPoint...')
@@ -532,6 +539,13 @@ function imageToBase64(url: string): Promise<string> {
   flex-direction: column;
   height: 100%;
   background: #fff;
+  overflow: hidden;
+}
+
+.generate-ppt-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ========== 全局Tab栏（始终置顶） ========== */

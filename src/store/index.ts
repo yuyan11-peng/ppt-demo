@@ -61,151 +61,13 @@ function genId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36)
 }
 
-function createDefaultSlides(): Slide[] {
-  return [
-    {
-      id: 'default_slide_1',
-      title: '欢迎使用 PPT Kit',
-      markdown: `# 🚀 PPT Kit - Vue3 Demo
-
-## 智能幻灯片生成工具
-
-支持以下核心特性：
-
-- 📝 **Markdown 实时编辑**与预览
-- 🎨 **代码高亮**显示
-- 📊 **Mermaid 图表**渲染
-- 📤 **导出 PPTX** 文件
-- 🎯 **多种布局**模板
-
-> 基于 ppt-kit 理念，使用 Vue3 + TypeScript 构建`,
-      contents: [],
-      layout: 'title',
-      createdAt: Date.now()
-    },
-    {
-      id: 'default_slide_2',
-      title: '技术架构',
-      markdown: `# 技术架构
-
-## 核心技术栈
-
-| 技术 | 用途 |
-|------|------|
-| Vue 3 | 前端框架 |
-| TypeScript | 类型安全 |
-| Vite | 构建工具 |
-| Marked | Markdown 解析 |
-| Highlight.js | 代码高亮 |
-| Mermaid | 图表渲染 |
-| PptxGenJS | PPT 导出 |
-
-## 架构图
-
-\`\`\`mermaid
-graph LR
-    A[Markdown 编辑器] --> B[解析引擎]
-    B --> C[实时预览]
-    B --> D[PPT 导出]
-    C --> E[代码高亮]
-    C --> F[Mermaid 图表]
-\`\`\``,
-      contents: [],
-      layout: 'content',
-      createdAt: Date.now()
-    },
-    {
-      id: 'default_slide_3',
-      title: '代码高亮示例',
-      markdown: `# 代码高亮示例
-
-## Vue 3 组合式 API
-
-\`\`\`typescript
-import { ref, computed, onMounted } from 'vue'
-
-interface Slide {
-  id: string
-  title: string
-  content: string
-}
-
-export function useSlideEditor() {
-  const slides = ref<Slide[]>([])
-  const currentIndex = ref(0)
-
-  const currentSlide = computed(() => 
-    slides.value[currentIndex.value]
-  )
-
-  const addSlide = (title: string) => {
-    slides.value.push({
-      id: crypto.randomUUID(),
-      title,
-      content: ''
-    })
-  }
-
-  return { slides, currentSlide, addSlide }
-}
-\`\`\`
-
-> 完美支持 TypeScript、Python、JavaScript 等多种语言的语法高亮`,
-      contents: [],
-      layout: 'code',
-      createdAt: Date.now()
-    },
-    {
-      id: 'default_slide_4',
-      title: 'Mermaid 图表',
-      markdown: `# Mermaid 图表支持
-
-## 流程图
-
-\`\`\`mermaid
-flowchart TD
-    A[开始] --> B{选择模板}
-    B -->|标题页| C[编辑标题]
-    B -->|内容页| D[编写 Markdown]
-    B -->|代码页| E[插入代码]
-    C --> F[实时预览]
-    D --> F
-    E --> F
-    F --> G{满意?}
-    G -->|是| H[导出 PPTX]
-    G -->|否| B
-    H --> I[完成 🎉]
-\`\`\`
-
-## 序列图
-
-\`\`\`mermaid
-sequenceDiagram
-    participant U as 用户
-    participant E as 编辑器
-    participant P as 解析器
-    participant R as 渲染器
-
-    U->>E: 输入 Markdown
-    E->>P: 解析内容
-    P->>R: 生成 HTML
-    R-->>U: 实时预览
-    U->>E: 导出 PPT
-    E->>P: 转换格式
-    P-->>U: 下载文件
-\`\`\``,
-      contents: [],
-      layout: 'content',
-      createdAt: Date.now()
-    }
-  ]
-}
+/** 不再提供默认 demo 数据，初始状态为空 */
 
 // ==================== 初始化状态 ====================
 
-// 优先从 localStorage 恢复，否则用默认数据
+// 优先从 localStorage 恢复，否则为空
 const stored = loadFromStorage()
-const initialSlides = stored ? stored.slides : createDefaultSlides()
+const initialSlides = stored ? stored.slides : []
 const initialIndex = stored ? stored.index : 0
 
 // State
@@ -306,6 +168,35 @@ function duplicateSlide(index: number) {
   currentSlideIndex.value = index + 1
 }
 
+/** 从大纲数据导入幻灯片（供 TaskPane 生成PPT后调用） */
+function importFromOutline(outline: Array<{ title: string; bullets: string[] }>, topic?: string) {
+  // 清空现有幻灯片
+  slides.splice(0, slides.length)
+
+  for (let i = 0; i < outline.length; i++) {
+    const item = outline[i]
+    const bulletsText = item.bullets.map(b => `- ${b}`).join('\n')
+    const markdown = `# ${item.title}\n\n${bulletsText}`
+    const layout: Slide['layout'] = i === 0 ? 'title' : 'content'
+
+    slides.push({
+      id: genId(),
+      title: item.title,
+      markdown,
+      contents: [],
+      layout,
+      createdAt: Date.now()
+    })
+  }
+
+  presentationInfo.name = topic || (outline[0]?.title || 'PPT Kit')
+  presentationInfo.slideCount = slides.length
+  currentSlideIndex.value = 0
+
+  // 立即持久化
+  saveToStorage([...slides], currentSlideIndex.value)
+}
+
 export function useStore() {
   return {
     slides,
@@ -319,6 +210,7 @@ export function useStore() {
     updateSlideMarkdown,
     updateSlideLayout,
     moveSlide,
-    duplicateSlide
+    duplicateSlide,
+    importFromOutline
   }
 }
