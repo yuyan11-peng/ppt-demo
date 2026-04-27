@@ -88,15 +88,23 @@ export async function applyOutlineToPowerPoint(outline: OutlineSlide[]): Promise
     return { success: false, message: '当前不在 Office 环境中' }
   }
 
+  console.log('[PowerPoint API] 开始写入大纲，共', outline.length, '页')
+  console.log('[PowerPoint API] 大纲内容:', outline)
+
   const Office = (globalThis as any).Office
   const supports14 = !!Office.context.requirements?.isSetSupported?.('PowerPointApi', '1.4')
   console.log('[PowerPoint API] PowerPointApi 1.4 supported:', supports14)
 
-  if (supports14) {
-    return applyOutlineViaTextFrame(outline)
-  } else {
-    return applyOutlineViaCommonApi(outline)
-  }
+  // 强制使用 Common API，因为 textFrame API 可能有问题
+  console.log('[PowerPoint API] 强制使用 Common API 方法')
+  return applyOutlineViaCommonApi(outline)
+
+  // 原来的代码
+  // if (supports14) {
+  //   return applyOutlineViaTextFrame(outline)
+  // } else {
+  //   return applyOutlineViaCommonApi(outline)
+  // }
 }
 
 /**
@@ -120,49 +128,29 @@ async function applyOutlineViaTextFrame(outline: OutlineSlide[]): Promise<{ succ
       }
       await context.sync()
 
-      // 处理第一张幻灯片
-      if (outline.length > 0) {
-        const firstSlide = slides.items[0]
-        const shapes = firstSlide.shapes
-        shapes.load('items,items/textFrame')
-        await context.sync()
-
-        let titleSet = false
-        let bodySet = false
-        for (const shape of shapes.items) {
-          try {
-            shape.textFrame.load('textRange')
-            await context.sync()
-
-            if (!titleSet) {
-              shape.textFrame.textRange.text = outline[0].title
-              titleSet = true
-            } else if (!bodySet) {
-              shape.textFrame.textRange.text = outline[0].bullets.join('\n')
-              bodySet = true
-            }
-          } catch {
-            // 某些形状没有 textFrame，跳过
-          }
+      // 处理所有幻灯片
+      for (let i = 0; i < outline.length; i++) {
+        let slide
+        if (i === 0) {
+          // 使用第一张幻灯片
+          slide = slides.items[0]
+        } else {
+          // 添加新幻灯片
+          presentation.slides.add()
+          await context.sync()
+          slides.load('items')
+          await context.sync()
+          slide = slides.items[slides.items.length - 1]
         }
-        await context.sync()
-      }
 
-      // 添加后续幻灯片
-      for (let i = 1; i < outline.length; i++) {
-        presentation.slides.add()
-        await context.sync()
-
-        slides.load('items')
-        await context.sync()
-
-        const newSlide = slides.items[slides.items.length - 1]
-        const shapes = newSlide.shapes
+        const shapes = slide.shapes
         shapes.load('items,items/textFrame')
         await context.sync()
 
         let titleSet = false
         let bodySet = false
+        
+        // 尝试使用现有文本框
         for (const shape of shapes.items) {
           try {
             shape.textFrame.load('textRange')
@@ -176,11 +164,52 @@ async function applyOutlineViaTextFrame(outline: OutlineSlide[]): Promise<{ succ
               bodySet = true
             }
           } catch {
-            // 跳过没有 textFrame 的形状
+            // 某些形状没有 textFrame，跳过
           }
         }
-        await context.sync()
+        
+        // 如果没有找到文本框，创建新的文本框
+        if (!titleSet || !bodySet) {
+          try {
+            // 尝试使用addShape方法创建文本框
+            try {
+              // 创建标题文本框
+              if (!titleSet) {
+                const titleShape = shapes.addShape(
+                  1, // Rectangle
+                  50,
+                  50,
+                  800,
+                  100
+                )
+                titleShape.textFrame.textRange.text = outline[i].title
+                titleSet = true
+                await context.sync()
+              }
+              
+              // 创建正文文本框
+              if (!bodySet) {
+                const bodyShape = shapes.addShape(
+                  1, // Rectangle
+                  50,
+                  170,
+                  800,
+                  400
+                )
+                bodyShape.textFrame.textRange.text = outline[i].bullets.join('\n')
+                bodySet = true
+                await context.sync()
+              }
+            } catch (e) {
+              console.warn('创建文本框失败:', e)
+            }
+          } catch (error) {
+            console.error('创建文本框失败:', error)
+          }
+        }
       }
+      
+      await context.sync()
     })
 
     return { success: true, message: `已生成 ${outline.length} 张幻灯片` }
@@ -194,62 +223,61 @@ async function applyOutlineViaTextFrame(outline: OutlineSlide[]): Promise<{ succ
  * 方案 B：通过 Common API 写入大纲（兼容 Office 2021 等只支持 1.1~1.2 的版本）
  *
  * 思路：
- *   1. 使用 PowerPoint.run 添加幻灯片（1.2 支持 insertSlidesFromBase64，但比较复杂）
- *   2. 更简单的做法：用 setSelectedDataAsync + SlideScope 逐页写入文本
- *
- * 在不支持 textFrame 的环境中，最可靠的方案是：
- *   - 使用 insertSlidesFromBase64 从模板插入幻灯片（1.2 支持）
- *   - 或用 setSelectedDataAsync(Ooxml) 写入内容
- *   - 这里采用最简单的方案：用 setSelectedDataAsync(Text) 逐步写入
+ *   1. 使用 PowerPoint.run 添加幻灯片
+ *   2. 使用 Common API 的 setSelectedDataAsync 方法添加内容
  */
 async function applyOutlineViaCommonApi(outline: OutlineSlide[]): Promise<{ success: boolean; message: string }> {
   const Office = (globalThis as any).Office
   const PowerPoint = Office.PowerPoint || (globalThis as any).PowerPoint
 
   try {
-    // 第一步：用 PowerPoint.run 管理幻灯片结构（添加/删除幻灯片，1.2 支持）
-    const supports12 = !!Office.context.requirements?.isSetSupported?.('PowerPointApi', '1.2')
-    console.log('[PowerPoint API][B] PowerPointApi 1.2 supported:', supports12)
+    console.log('[PowerPoint API][B] 开始处理大纲:', outline)
+    
+    // 第一步：用 PowerPoint.run 管理幻灯片结构
+    await PowerPoint.run(async (context: any) => {
+      const presentation = context.presentation
+      const slides = presentation.slides
+      slides.load('items')
+      await context.sync()
 
-    if (supports12 && outline.length > 1) {
-      await PowerPoint.run(async (context: any) => {
-        const presentation = context.presentation
-        const slides = presentation.slides
-        slides.load('items')
-        await context.sync()
+      // 删除所有幻灯片，重新创建
+      const existingCount = slides.items.length
+      console.log('[PowerPoint API][B] 当前幻灯片数量:', existingCount)
+      
+      for (let i = existingCount - 1; i >= 0; i--) {
+        slides.items[i].delete()
+      }
+      await context.sync()
+      console.log('[PowerPoint API][B] 已删除所有幻灯片')
 
-        // 删除多余幻灯片（保留第一张）
-        const existingCount = slides.items.length
-        for (let i = existingCount - 1; i > 0; i--) {
-          slides.items[i].delete()
-        }
-        await context.sync()
+      // 添加需要的幻灯片数量
+      for (let i = 0; i < outline.length; i++) {
+        presentation.slides.add()
+      }
+      await context.sync()
+      console.log('[PowerPoint API][B] 已添加', outline.length, '张幻灯片')
+    })
 
-        // 添加需要的幻灯片数量
-        for (let i = 1; i < outline.length; i++) {
-          presentation.slides.add()
-        }
-        await context.sync()
-        console.log(`[PowerPoint API][B] 已准备 ${outline.length} 张幻灯片`)
-      })
-    }
-
-    // 第二步：用 Common API setSelectedDataAsync 逐页写入文本
-    // 首先尝试选中并写入每一页的内容
+    // 第二步：使用 Common API 逐页写入内容
     for (let i = 0; i < outline.length; i++) {
-      const slideContent = outline[i].title + '\n\n' + outline[i].bullets.join('\n')
-
-      // 通过 goToByIdAsync 定位到对应幻灯片（Common API）
+      console.log('[PowerPoint API][B] 处理第', i + 1, '页:', outline[i])
+      
+      // 跳转到当前幻灯片
       await goToSlideIndex(Office, i)
-
-      // 短暂等待幻灯片切换完成
+      
+      // 等待幻灯片切换完成
       await sleep(300)
-
-      // 写入文本内容
+      
+      // 准备内容
+      const slideContent = outline[i].title + '\n\n' + outline[i].bullets.join('\n')
+      console.log('[PowerPoint API][B] 准备写入内容:', slideContent)
+      
+      // 写入内容
       await setSelectedText(Office, slideContent)
-      console.log(`[PowerPoint API][B] 已写入第 ${i + 1} 页`)
+      console.log('[PowerPoint API][B] 已写入第', i + 1, '页内容')
     }
 
+    console.log('[PowerPoint API][B] 所有幻灯片处理完成')
     return { success: true, message: `已生成 ${outline.length} 张幻灯片（兼容模式）` }
   } catch (e) {
     console.error('[PowerPoint API][B] 写入失败:', e)

@@ -692,13 +692,19 @@ async function handleGeneratePPT() {
 
   loading.value = true
   try {
+    // 准备大纲数据
     const outline = outlineList.value.map(item => ({
       title: item.title,
       bullets: item.children,
     }))
+    
+    console.log('准备生成PPT，大纲数据:', outline)
+    console.log('大纲长度:', outline.length)
 
     if (isOfficeContext()) {
+      console.log('在Office环境中，调用applyOutlineToPowerPoint')
       const result = await applyOutlineToPowerPoint(outline)
+      console.log('applyOutlineToPowerPoint结果:', result)
       if (result.success) {
         ElMessage.success(result.message)
       } else {
@@ -708,6 +714,7 @@ async function handleGeneratePPT() {
       ElMessage.warning('当前不在 Office 环境中，无法写入 PPT')
     }
   } catch (e) {
+    console.error('生成PPT失败:', e)
     ElMessage.error('生成PPT失败: ' + (e as Error).message)
   } finally {
     loading.value = false
