@@ -91,20 +91,9 @@ export async function applyOutlineToPowerPoint(outline: OutlineSlide[]): Promise
   console.log('[PowerPoint API] 开始写入大纲，共', outline.length, '页')
   console.log('[PowerPoint API] 大纲内容:', outline)
 
-  const Office = (globalThis as any).Office
-  const supports14 = !!Office.context.requirements?.isSetSupported?.('PowerPointApi', '1.4')
-  console.log('[PowerPoint API] PowerPointApi 1.4 supported:', supports14)
-
-  // 强制使用 Common API，因为 textFrame API 可能有问题
-  console.log('[PowerPoint API] 强制使用 Common API 方法')
-  return applyOutlineViaCommonApi(outline)
-
-  // 原来的代码
-  // if (supports14) {
-  //   return applyOutlineViaTextFrame(outline)
-  // } else {
-  //   return applyOutlineViaCommonApi(outline)
-  // }
+  // 使用 textFrame API 方法，它能直接设置文本框内容，覆盖默认占位符
+  console.log('[PowerPoint API] 使用 textFrame API 方法')
+  return applyOutlineViaTextFrame(outline)
 }
 
 /**

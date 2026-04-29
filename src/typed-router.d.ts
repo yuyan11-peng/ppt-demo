@@ -58,6 +58,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/ai/layout1': RouteRecordInfo<
+      '/ai/layout1',
+      '/ai/layout1',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/ai/optimize': RouteRecordInfo<
       '/ai/optimize',
       '/ai/optimize',
@@ -133,6 +140,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/ai/layout.vue': {
       routes:
         | '/ai/layout'
+      views:
+        | never
+    }
+    'src/pages/ai/layout1.vue': {
+      routes:
+        | '/ai/layout1'
       views:
         | never
     }

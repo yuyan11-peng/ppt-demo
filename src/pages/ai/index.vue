@@ -67,8 +67,11 @@ function navigateTo(path: string) {
 <style scoped>
 .home-content {
   flex: 1;
-  overflow-y: auto;
-  padding: 4px 0;
+  overflow: hidden;
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  /* gap: 20px; */
 }
 
 .main-panel {

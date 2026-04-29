@@ -192,6 +192,7 @@ const prompt = ref('')
 const selectedTextBoxIndex = ref(0) // 当前选中的文本框索引
 const hasPowerPointSelection = ref(false) // 是否有PowerPoint选中文本
 let lastPowerPointText = '' // 最后一次从PowerPoint复制的文本
+let isReadingFromPPT = false // 正在从PPT读取设置时，暂停 watch 自动同步
 
 interface TextBoxItem {
   id: number
@@ -230,7 +231,31 @@ function handleTextBoxClick(index: number) {
   selectedTextBoxIndex.value = index
 }
 
-// 从PowerPoint读取当前字体设置
+// 标准化文本：去除多余空白，统一换行符，用于宽松匹配
+function normalizeText(text: string): string {
+  return text
+    .replace(/\r\n/g, '\n')   // 统一换行符
+    .replace(/\r/g, '\n')     // 统一换行符
+    .replace(/[ \t]+/g, ' ')  // 多个空格/tab 合并为一个空格
+    .replace(/\n\s*\n/g, '\n') // 多个空行合并为一个
+    .trim()
+}
+
+// 将 PowerPoint 返回的 horizontalAlignment 值统一转换为 'left' | 'center' | 'right'
+// API 可能返回: 枚举数字、大写/小写字符串、PowerPoint.Alignment 枚举值等
+function parseHorizontalAlignment(value: any): 'left' | 'center' | 'right' {
+  if (value == null) return 'left'
+  const str = String(value).toLowerCase()
+  if (str.includes('center')) return 'center'
+  if (str.includes('right')) return 'right'
+  if (str.includes('left')) return 'left'
+  // 数字枚举：1=Left, 2=Center, 3=Right, 4=Justify, 5=Distribute
+  if (value === 2) return 'center'
+  if (value === 3) return 'right'
+  return 'left'
+}
+
+// 从PowerPoint读取当前选中文字的字体设置
 async function readFontSettingsFromPowerPoint() {
   if (!isOfficeContext()) {
     ElMessage.warning('当前不在 Office 环境中，无法读取字体设置')
@@ -238,197 +263,304 @@ async function readFontSettingsFromPowerPoint() {
   }
   
   loading.value = true
+  isReadingFromPPT = true
   try {
     const Office = getOfficeContext()
-    console.log('开始从PowerPoint读取字体设置')
-    
-    // 检查Office.js版本
-    console.log('Office.js版本:', Office.context.diagnostics.version)
-    
-    // 尝试使用PowerPoint.run方法读取字体设置
-    console.log('尝试使用PowerPoint.run方法读取字体设置')
-    
-    const PowerPoint = Office.PowerPoint || (globalThis as any).PowerPoint;
-    if (PowerPoint) {
-      try {
-        await PowerPoint.run(async (context: any) => {
-          // 获取当前演示文稿
-          const presentation = context.presentation;
-          // 获取所有幻灯片
-          const slides = presentation.slides;
-          slides.load('items');
-          
-          await context.sync();
-          console.log('获取到的幻灯片数量:', slides.items.length);
-          
-          // 遍历所有幻灯片
-          for (let i = 0; i < slides.items.length; i++) {
-            const slide = slides.items[i];
-            // 获取幻灯片上的所有形状
-            const shapes = slide.shapes;
-            shapes.load('items');
-            
-            await context.sync();
-            console.log('幻灯片', i, '上的形状数量:', shapes.items.length);
-            
-            // 遍历所有形状
-            for (let j = 0; j < shapes.items.length; j++) {
-              const shape = shapes.items[j];
-              try {
-                // 尝试获取文本框
-                const textFrame = shape.textFrame;
-                textFrame.load('textRange');
-                
-                await context.sync();
-                
-                // 获取文本范围
-                const textRange = textFrame.textRange;
-                textRange.load('text');
-                
-                await context.sync();
-                
-                // 获取当前选中的文本框的内容
-                const selectedTextBox = textBoxList.value[selectedTextBoxIndex.value];
-                const inputText = selectedTextBox ? selectedTextBox.content.trim() : '';
-                
-                // 检查文本内容是否与输入框内容相同
-                console.log('形状文本内容:', textRange.text);
-                console.log('输入框内容:', inputText);
-                
-                if (textRange.text.trim() === inputText) {
-                  console.log('找到匹配的文本');
-                  
-                  // 获取字体
-                  const font = textRange.font;
-                  font.load('name', 'size', 'bold');
-                  
-                  // 获取段落格式
-                  const paragraphFormat = textRange.paragraphFormat;
-                  paragraphFormat.load('horizontalAlignment');
-                  
-                  await context.sync();
-                  
-                  // 更新字体设置
-                  fontFamily.value = font.name || 'TencentSans-W3';
-                  fontSize.value = font.size || 12;
-                  isBold.value = font.bold || false;
-                  
-                  // 更新对齐方式
-                  switch (paragraphFormat.horizontalAlignment) {
-                    case PowerPoint.Alignment.left:
-                      align.value = 'left';
-                      break;
-                    case PowerPoint.Alignment.center:
-                      align.value = 'center';
-                      break;
-                    case PowerPoint.Alignment.right:
-                      align.value = 'right';
-                      break;
-                    default:
-                      align.value = 'left';
-                  }
-                  
-                  console.log('读取到的字体设置:', {
-                    fontFamily: fontFamily.value,
-                    fontSize: fontSize.value,
-                    isBold: isBold.value,
-                    align: align.value
-                  });
-                  
-                  ElMessage.success('字体设置已从PowerPoint读取');
-                  return;
-                }
-              } catch (error) {
-                console.warn('处理形状失败:', error);
-                // 继续处理下一个形状
-              }
-            }
+    console.log('开始从PowerPoint读取选中文字的字体设置')
+
+    // Step 1: 先通过 Common API 获取PPT中当前选中的文字
+    const selectedText = await new Promise<string>((resolve, reject) => {
+      Office.context.document.getSelectedDataAsync(
+        Office.CoercionType.Text,
+        (asyncResult: any) => {
+          if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+            resolve((asyncResult.value || '').trim())
+          } else {
+            reject(new Error('获取选中文本失败: ' + asyncResult.error.message))
           }
-          
-          // 如果没有找到匹配的文本，尝试使用Common API
-          console.log('没有找到匹配的文本，尝试使用Common API');
-          
-          // 先获取当前选中的文本
-          await new Promise<void>((resolve, reject) => {
-            Office.context.document.getSelectedDataAsync(
-              Office.CoercionType.Text,
-              (asyncResult) => {
-                if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-                  const selectedText = asyncResult.value || '';
-                  console.log('当前选中的文本:', selectedText);
-                  
-                  // 获取当前选中的文本框的内容
-                  const selectedTextBox = textBoxList.value[selectedTextBoxIndex.value];
-                  const inputText = selectedTextBox ? selectedTextBox.content.trim() : '';
-                  console.log('输入框内容:', inputText);
-                  
-                  // 检查选中的文本是否与输入框内容相同
-                  if (selectedText.trim() === inputText) {
-                    // 由于Common API的限制，无法直接获取字体属性
-                    // 这里可以提示用户
-                    ElMessage.info('Common API无法直接获取字体属性，请使用PowerPoint API');
-                    resolve();
-                  } else {
-                    console.error('选中的文本与输入框内容不匹配');
-                    ElMessage.warning('选中的文本与输入框内容不匹配');
-                    resolve();
+        }
+      )
+    })
+
+    if (!selectedText) {
+      ElMessage.warning('请先在PowerPoint中选中要读取字体设置的文字')
+      return
+    }
+
+    console.log('PPT中选中的文字:', JSON.stringify(selectedText))
+
+    // Step 2: 将选中的文字回显到当前输入框
+    const selectedTextBox = textBoxList.value[selectedTextBoxIndex.value]
+    if (selectedTextBox) {
+      selectedTextBox.content = selectedText
+      console.log('已将选中文本回显到输入框')
+    }
+
+    // Step 3: 使用 PowerPoint API 读取选中文字的字体属性
+    const PowerPoint = Office.PowerPoint || (globalThis as any).PowerPoint
+    if (!PowerPoint) {
+      ElMessage.info('PowerPoint API 不可用，无法读取字体属性')
+      return
+    }
+
+    await PowerPoint.run(async (context: any) => {
+      // ===== 方案1: 通过 getSelectedTextRange 直接读取（最可靠） =====
+      try {
+        const selectedTextRange = context.presentation.getSelectedTextRange()
+        // 分步加载：先加载 textRange 本身
+        context.load(selectedTextRange, 'text')
+        await context.sync()
+
+        if (selectedTextRange.text && selectedTextRange.text.trim()) {
+          console.log('通过 getSelectedTextRange 获取到选中文本:', selectedTextRange.text)
+
+          // 加载字体属性（字号、字体、加粗）
+          const font = selectedTextRange.font
+          context.load(font, 'name, size, bold')
+          await context.sync()
+
+          // 回显字体属性到工具栏
+          fontFamily.value = font.name || 'TencentSans-W3'
+          fontSize.value = font.size || 12
+          isBold.value = font.bold || false
+
+          console.log('通过 getSelectedTextRange 读取字体:', {
+            fontFamily: fontFamily.value,
+            fontSize: fontSize.value,
+            isBold: isBold.value
+          })
+
+          // 对齐方式：通过 paragraphs 集合获取实际段落格式
+          // 直接使用 textRange.paragraphFormat 可能返回不准确的默认值
+          try {
+            // 方法A: 从 getSelectedTextRange 的 paragraphs 集合读取
+            try {
+              const paragraphs = selectedTextRange.paragraphs
+              context.load(paragraphs, 'items')
+              await context.sync()
+
+              if (paragraphs.items && paragraphs.items.length > 0) {
+                const firstParagraph = paragraphs.items[0]
+                const pFormat = firstParagraph.paragraphFormat
+                context.load(pFormat, 'horizontalAlignment')
+                await context.sync()
+
+                const rawAlign = pFormat.horizontalAlignment
+                console.log('从段落集合读取对齐方式原始值:', rawAlign, '类型:', typeof rawAlign)
+                align.value = parseHorizontalAlignment(rawAlign)
+              } else {
+                align.value = 'left'
+              }
+            } catch (paraErr: any) {
+              // 方法B: 回退到 getSelectedShapes
+              console.log('段落集合不可用，尝试 getSelectedShapes:', paraErr.message || paraErr)
+              try {
+                const selectedShapes = context.presentation.getSelectedShapes()
+                context.load(selectedShapes, 'items')
+                await context.sync()
+
+                if (selectedShapes.items && selectedShapes.items.length > 0) {
+                  const shape = selectedShapes.items[0]
+                  const textFrame = shape.textFrame
+                  context.load(textFrame, 'textRange')
+                  await context.sync()
+
+                  const shapeTextRange = textFrame.textRange
+                  // 尝试从形状的 paragraphs 集合读取
+                  try {
+                    const shapeParagraphs = shapeTextRange.paragraphs
+                    context.load(shapeParagraphs, 'items')
+                    await context.sync()
+
+                    if (shapeParagraphs.items && shapeParagraphs.items.length > 0) {
+                      const sp = shapeParagraphs.items[0]
+                      const spFormat = sp.paragraphFormat
+                      context.load(spFormat, 'horizontalAlignment')
+                      await context.sync()
+
+                      const rawAlign = spFormat.horizontalAlignment
+                      console.log('从形状段落集合读取对齐方式原始值:', rawAlign, '类型:', typeof rawAlign)
+                      align.value = parseHorizontalAlignment(rawAlign)
+                    } else {
+                      // 最后回退到 textRange.paragraphFormat
+                      const paragraphFormat = shapeTextRange.paragraphFormat
+                      context.load(paragraphFormat, 'horizontalAlignment')
+                      await context.sync()
+                      const rawAlign = paragraphFormat.horizontalAlignment
+                      console.log('从形状textRange读取对齐方式原始值:', rawAlign, '类型:', typeof rawAlign)
+                      align.value = parseHorizontalAlignment(rawAlign)
+                    }
+                  } catch (shapeParaErr: any) {
+                    const paragraphFormat = shapeTextRange.paragraphFormat
+                    context.load(paragraphFormat, 'horizontalAlignment')
+                    await context.sync()
+                    const rawAlign = paragraphFormat.horizontalAlignment
+                    console.log('回退: 从形状textRange读取对齐方式:', rawAlign, '类型:', typeof rawAlign)
+                    align.value = parseHorizontalAlignment(rawAlign)
                   }
                 } else {
-                  console.error('获取文本失败:', asyncResult.error);
-                  ElMessage.warning('请先在PowerPoint中选中要读取字体设置的文本');
-                  resolve();
+                  align.value = 'left'
                 }
+              } catch (shapeErr: any) {
+                console.log('getSelectedShapes 也不可用:', shapeErr.message || shapeErr)
+                align.value = 'left'
               }
-            );
-          });
-        });
-      } catch (error) {
-        console.error('PowerPoint.run失败:', error);
-        ElMessage.error('读取字体设置失败: ' + (error as Error).message);
+            }
+          } catch (alignErr: any) {
+            console.log('读取对齐方式全部失败:', alignErr.message || alignErr)
+            align.value = 'left'
+          }
+
+          console.log('读取到的字体设置:', {
+            fontFamily: fontFamily.value,
+            fontSize: fontSize.value,
+            isBold: isBold.value,
+            align: align.value
+          })
+
+          ElMessage.success('字体设置已从PPT读取')
+          return
+        }
+      } catch (e: any) {
+        console.log('getSelectedTextRange 不可用:', e.message || e)
       }
-    } else {
-      console.log('PowerPoint API不可用，使用Common API');
-      
-      // 如果PowerPoint API不可用，使用Common API
-      // 先获取当前选中的文本
-      await new Promise<void>((resolve, reject) => {
-        Office.context.document.getSelectedDataAsync(
-          Office.CoercionType.Text,
-          (asyncResult) => {
-            if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-              const selectedText = asyncResult.value || '';
-              console.log('当前选中的文本:', selectedText);
-              
-              // 获取当前选中的文本框的内容
-              const selectedTextBox = textBoxList.value[selectedTextBoxIndex.value];
-              const inputText = selectedTextBox ? selectedTextBox.content.trim() : '';
-              console.log('输入框内容:', inputText);
-              
-              // 检查选中的文本是否与输入框内容相同
-              if (selectedText.trim() === inputText) {
-                // 由于Common API的限制，无法直接获取字体属性
-                // 这里可以提示用户
-                ElMessage.info('Common API无法直接获取字体属性，请使用PowerPoint API');
-                resolve();
-              } else {
-                console.error('选中的文本与输入框内容不匹配');
-                ElMessage.warning('选中的文本与输入框内容不匹配');
-                resolve();
+
+      // ===== 方案2: 通过 getSelectedShapes 获取选中形状，读取其字体属性 =====
+      try {
+        const selectedShapes = context.presentation.getSelectedShapes()
+        context.load(selectedShapes, 'items')
+        await context.sync()
+
+        if (selectedShapes.items && selectedShapes.items.length > 0) {
+          console.log('通过 getSelectedShapes 获取到选中形状数量:', selectedShapes.items.length)
+
+          // 取第一个选中的形状
+          const shape = selectedShapes.items[0]
+          const textFrame = shape.textFrame
+          context.load(textFrame, 'textRange')
+          await context.sync()
+
+          const textRange = textFrame.textRange
+          context.load(textRange, 'text')
+          await context.sync()
+
+          if (textRange.text && textRange.text.trim()) {
+            // 加载字体和段落属性
+            const font = textRange.font
+            context.load(font, 'name, size, bold')
+            const paragraphFormat = textRange.paragraphFormat
+            context.load(paragraphFormat, 'horizontalAlignment')
+            await context.sync()
+
+            // 回显到工具栏
+            fontFamily.value = font.name || 'TencentSans-W3'
+            fontSize.value = font.size || 12
+            isBold.value = font.bold || false
+
+            const rawAlign2 = paragraphFormat.horizontalAlignment
+            console.log('对齐方式原始值:', rawAlign2, '类型:', typeof rawAlign2)
+            align.value = parseHorizontalAlignment(rawAlign2)
+
+            console.log('读取到的字体设置:', {
+              fontFamily: fontFamily.value,
+              fontSize: fontSize.value,
+              isBold: isBold.value,
+              align: align.value
+            })
+
+            ElMessage.success('字体设置已从PPT读取')
+            return
+          }
+        }
+      } catch (e: any) {
+        console.log('getSelectedShapes 不可用:', e.message || e)
+      }
+
+      // ===== 方案3: 遍历当前幻灯片的形状，用文本匹配查找 =====
+      try {
+        const presentation = context.presentation
+        const slides = presentation.slides
+        context.load(slides, 'items')
+        await context.sync()
+
+        const normalizedSelected = normalizeText(selectedText)
+
+        let found = false
+        for (let i = 0; i < slides.items.length && !found; i++) {
+          const slide = slides.items[i]
+          const shapes = slide.shapes
+          context.load(shapes, 'items')
+          await context.sync()
+
+          for (let j = 0; j < shapes.items.length && !found; j++) {
+            const shape = shapes.items[j]
+            try {
+              const textFrame = shape.textFrame
+              context.load(textFrame, 'textRange')
+              await context.sync()
+
+              const textRange = textFrame.textRange
+              context.load(textRange, 'text')
+              await context.sync()
+
+              if (!textRange.text) continue
+
+              const shapeText = textRange.text.trim()
+              const normalizedShapeText = normalizeText(shapeText)
+
+              // 多级匹配
+              const isMatch = shapeText.includes(selectedText)
+                || normalizedShapeText.includes(normalizedSelected)
+                || normalizedSelected.includes(normalizedShapeText)
+
+              console.log(`形状[${i}][${j}] 文本匹配: ${isMatch}, 形状文本: ${JSON.stringify(shapeText.substring(0, 50))}`)
+
+              if (isMatch) {
+                const font = textRange.font
+                context.load(font, 'name, size, bold')
+                const paragraphFormat = textRange.paragraphFormat
+                context.load(paragraphFormat, 'horizontalAlignment')
+                await context.sync()
+
+                fontFamily.value = font.name || 'TencentSans-W3'
+                fontSize.value = font.size || 12
+                isBold.value = font.bold || false
+
+                const rawAlign3 = paragraphFormat.horizontalAlignment
+                console.log('对齐方式原始值:', rawAlign3, '类型:', typeof rawAlign3)
+                align.value = parseHorizontalAlignment(rawAlign3)
+                ElMessage.info(`对齐原始值: ${JSON.stringify(rawAlign3)} (类型: ${typeof rawAlign3})`)
+
+                console.log('读取到的字体设置:', {
+                  fontFamily: fontFamily.value,
+                  fontSize: fontSize.value,
+                  isBold: isBold.value,
+                  align: align.value
+                })
+
+                ElMessage.success('字体设置已从PPT读取')
+                found = true
               }
-            } else {
-              console.error('获取文本失败:', asyncResult.error);
-              ElMessage.warning('请先在PowerPoint中选中要读取字体设置的文本');
-              resolve();
+            } catch (error) {
+              console.warn('处理形状失败:', error)
             }
           }
-        );
-      });
-    }
+        }
+
+        if (!found) {
+          ElMessage.warning('未找到选中文字对应的形状，无法读取字体属性')
+        }
+      } catch (e: any) {
+        console.error('遍历形状失败:', e)
+        ElMessage.warning('读取字体属性失败: ' + (e.message || e))
+      }
+    })
   } catch (error) {
-    console.error('读取字体设置失败:', error);
-    ElMessage.error('读取字体设置失败: ' + (error as Error).message);
+    console.error('读取字体设置失败:', error)
+    ElMessage.error('读取字体设置失败: ' + (error as Error).message)
   } finally {
     loading.value = false
+    isReadingFromPPT = false
   }
 }
 
@@ -440,157 +572,49 @@ async function applyFontSettingsToPowerPoint() {
   }
 
   loading.value = true;
+  isReadingFromPPT = true
   try {
     const Office = getOfficeContext();
-    console.log('开始将字体设置应用到PowerPoint');
-    console.log('字体设置: ', { fontFamily: fontFamily.value, fontSize: fontSize.value, isBold: isBold.value, align: align.value });
+    const PowerPoint = Office.PowerPoint || (globalThis as any).PowerPoint;
 
-    // 1. 获取选中的纯文本
-    const selectedText = await new Promise<string>((resolve, reject) => {
-      Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, (res) => {
-        if (res.status === Office.AsyncResultStatus.Succeeded) {
-          resolve(res.value || '');
-        } else {
-          reject(new Error('获取选中文本失败: ' + res.error.message));
-        }
-      });
-    });
-
-    if (!selectedText.trim()) {
-      ElMessage.warning('请先在 PowerPoint 中选中一段文本');
-      loading.value = false;
+    if (!PowerPoint) {
+      ElMessage.warning('PowerPoint API 不可用，无法应用字体设置');
       return;
     }
 
-    // 2. 尝试使用PowerPoint.run方法设置字体属性
-    console.log('尝试使用PowerPoint.run方法设置字体属性');
-    
-    const PowerPoint = Office.PowerPoint || (globalThis as any).PowerPoint;
-    if (PowerPoint) {
-      try {
-        await PowerPoint.run(async (context: any) => {
-          // 获取当前演示文稿
-          const presentation = context.presentation;
-          // 获取所有幻灯片
-          const slides = presentation.slides;
-          slides.load('items');
-          
-          await context.sync();
-          console.log(11);
-          
-          // 遍历所有幻灯片
-          for (let i = 0; i < slides.items.length; i++) {
-            const slide = slides.items[i];
-            // 获取幻灯片上的所有形状
-            const shapes = slide.shapes;
-            shapes.load('items');
-            
-            await context.sync();
-            
-            // 遍历所有形状
-            for (let j = 0; j < shapes.items.length; j++) {
-              const shape = shapes.items[j];
-              try {
-                console.log(44);
-                
-                console.log(33);
-                
-                // 尝试获取文本框
-                const textFrame = shape.textFrame;
-                textFrame.load('textRange');
-                
-                await context.sync();
-                
-                // 获取文本范围
-                const textRange = textFrame.textRange;
-                // 获取字体
-                const font = textRange.font;
-                // 设置字体属性
-                font.name = fontFamily.value;
-                font.size = fontSize.value;
-                font.bold = isBold.value;
-                
-                // 设置对齐方式
-                textRange.paragraphFormat.horizontalAlignment = align.value;
-                console.log(22);
-                
-                await context.sync();
-                console.log('字体设置应用成功');
-              } catch (error) {
-                console.warn('处理形状失败:', error);
-                // 继续处理下一个形状
-              }
-            }
-          }
-          
-          ElMessage.success('字体设置已应用');
-        });
-      } catch (error) {
-        console.error('PowerPoint.run失败:', error);
-        // 如果PowerPoint.run失败，尝试使用setSelectedDataAsync方法
-        console.log('PowerPoint.run失败，尝试使用setSelectedDataAsync方法');
-        
-        // 尝试设置选中的文本的字体属性，保持文本内容不变
-        await new Promise<void>((resolve, reject) => {
-          Office.context.document.setSelectedDataAsync(
-            selectedText, // 使用当前选中的文本，保持内容不变
-            {
-              coercionType: Office.CoercionType.Text,
-              font: {
-                name: fontFamily.value,
-                size: fontSize.value,
-                bold: isBold.value
-              }
-            },
-            (setResult) => {
-              if (setResult.status === Office.AsyncResultStatus.Succeeded) {
-                console.log('字体设置应用成功')
-                ElMessage.success('字体设置已应用')
-                resolve()
-              } else {
-                console.error('设置失败:', setResult.error)
-                ElMessage.error('设置失败: ' + setResult.error.message)
-                reject(new Error('设置失败: ' + setResult.error.message))
-              }
-            }
-          );
-        });
+    console.log('开始将字体设置应用到PowerPoint选中文字');
+    console.log('字体设置: ', { fontFamily: fontFamily.value, fontSize: fontSize.value, isBold: isBold.value, align: align.value });
+
+    await PowerPoint.run(async (context: any) => {
+      const selectedTextRange = context.presentation.getSelectedTextRange()
+      context.load(selectedTextRange, 'text')
+      await context.sync()
+
+      if (!selectedTextRange.text || !selectedTextRange.text.trim()) {
+        ElMessage.warning('请先在 PowerPoint 中选中一段文本');
+        return;
       }
-    } else {
-      console.log('PowerPoint API不可用，使用setSelectedDataAsync方法');
-      
-      // 如果PowerPoint API不可用，使用setSelectedDataAsync方法
-      // 尝试设置选中的文本的字体属性，保持文本内容不变
-      await new Promise<void>((resolve, reject) => {
-        Office.context.document.setSelectedDataAsync(
-          selectedText, // 使用当前选中的文本，保持内容不变
-          {
-            coercionType: Office.CoercionType.Text,
-            font: {
-              name: fontFamily.value,
-              size: fontSize.value,
-              bold: isBold.value
-            }
-          },
-          (setResult) => {
-            if (setResult.status === Office.AsyncResultStatus.Succeeded) {
-              console.log('字体设置应用成功')
-              ElMessage.success('字体设置已应用')
-              resolve()
-            } else {
-              console.error('设置失败:', setResult.error)
-              ElMessage.error('设置失败: ' + setResult.error.message)
-              reject(new Error('设置失败: ' + setResult.error.message))
-            }
-          }
-        );
-      });
-    }
+
+      // 只修改选中文本的字体属性
+      const font = selectedTextRange.font
+      font.name = fontFamily.value
+      font.size = fontSize.value
+      font.bold = isBold.value
+
+      // 设置选中文本的对齐方式
+      const paragraphFormat = selectedTextRange.paragraphFormat
+      paragraphFormat.horizontalAlignment = toPowerPointAlignment(align.value)
+
+      await context.sync()
+      console.log('字体设置已应用到选中文本');
+      ElMessage.success('字体设置已应用到选中文本');
+    });
   } catch (error) {
     console.error('应用字体设置失败:', error);
     ElMessage.error('应用字体设置失败: ' + (error as Error).message);
   } finally {
     loading.value = false;
+    isReadingFromPPT = false
   }
 }
 
@@ -609,15 +633,135 @@ async function applyLayoutTemplateToPowerPoint(index: number) {
     ElMessage.warning('当前不在 Office 环境中，无法应用排版模板')
     return
   }
-  
+
   loading.value = true
   try {
     const Office = getOfficeContext()
     const template = layoutRecommendations.value[index]
     console.log('开始将排版模板应用到PowerPoint:', template)
-    
-    // 这里需要根据PowerPoint API的实际情况实现应用排版模板的逻辑
-    ElMessage.info('将排版模板应用到PowerPoint功能开发中')
+
+    const PowerPoint = Office.PowerPoint || (globalThis as any).PowerPoint;
+    if (PowerPoint) {
+      try {
+        await PowerPoint.run(async (context: any) => {
+          // 获取当前演示文稿
+          const presentation = context.presentation;
+
+          // 获取选中的幻灯片集合
+          const selectedSlides = presentation.getSelectedSlides();
+          console.log('选中的幻灯片集合:', selectedSlides);
+
+          // 获取集合中的第一张（当前活动）幻灯片
+          const firstSelectedSlide = selectedSlides.getItemAt(0);
+          console.log('第一张选中的幻灯片:', firstSelectedSlide);
+
+          // 加载幻灯片的ID和索引
+          firstSelectedSlide.load('id');
+          firstSelectedSlide.load('index');
+
+          // 执行同步，从 PowerPoint 拉取数据
+          await context.sync();
+
+          // 获取索引（从0开始）
+          const slideIndex = firstSelectedSlide.index;
+          const slideId = firstSelectedSlide.id;
+
+          console.log(`当前选中的幻灯片索引是: ${slideIndex}`);
+          console.log(`其对应的ID是: ${slideId}`);
+
+          // 设置目标幻灯片和索引（转换为从1开始）
+          const targetSlide = firstSelectedSlide;
+          const targetSlideIndex = slideIndex + 1;
+
+          console.log('当前选中的是第', targetSlideIndex, '张幻灯片');
+
+          // 获取目标幻灯片上的所有形状
+          const shapes = targetSlide.shapes;
+          shapes.load('items');
+          await context.sync();
+
+          console.log('目标幻灯片上的形状数量:', shapes.items.length);
+
+          // 加载所有形状的文本内容
+          const shapeInfoList: any[] = [];
+          for (let j = 0; j < shapes.items.length; j++) {
+            const shape = shapes.items[j];
+            const hasTextFrame = shape.hasTextFrame;
+
+            if (hasTextFrame) {
+              const textFrame = shape.textFrame;
+              textFrame.load('textRange');
+            }
+
+            // 加载位置和大小属性
+            shape.load('left', 'top', 'width', 'height');
+          }
+
+          await context.sync();
+
+          // 收集形状信息
+          for (let j = 0; j < shapes.items.length; j++) {
+            const shape = shapes.items[j];
+            let textLength = 0;
+
+            if (shape.hasTextFrame && shape.textFrame && shape.textFrame.textRange) {
+              try {
+                const textRange = shape.textFrame.textRange;
+                textRange.load('text');
+              } catch (e) {
+                console.log('无法加载文本范围');
+              }
+            }
+
+            shapeInfoList.push({
+              shape: shape,
+              textLength: textLength
+            });
+          }
+
+          await context.sync();
+
+          // 更新文本长度信息
+          for (let j = 0; j < shapeInfoList.length; j++) {
+            const info = shapeInfoList[j];
+            const shape = info.shape;
+
+            if (shape.hasTextFrame && shape.textFrame && shape.textFrame.textRange) {
+              try {
+                info.textLength = shape.textFrame.textRange.text?.length || 0;
+              } catch (e) {
+                info.textLength = 0;
+              }
+            }
+          }
+
+          // 根据布局类型调整形状位置
+          switch (template.layoutType) {
+            case 'vertical':
+              await applyVerticalLayout(context, targetSlide, shapes.items, shapeInfoList, template);
+              break;
+            case 'horizontal':
+              await applyHorizontalLayout(context, targetSlide, shapes.items, shapeInfoList, template);
+              break;
+            case 'center':
+              await applyCenterLayout(context, targetSlide, shapes.items, shapeInfoList, template);
+              break;
+            case 'circular':
+              await applyCircularLayout(context, targetSlide, shapes.items, shapeInfoList, template);
+              break;
+          }
+
+          await context.sync();
+          ElMessage.success('排版模板已应用到第 ' + targetSlideIndex + ' 张幻灯片');
+        });
+      } catch (error) {
+        console.error('PowerPoint.run失败:', error);
+        ElMessage.error('应用排版模板失败: ' + (error as Error).message);
+      }
+    } else {
+      console.log('PowerPoint API不可用');
+      ElMessage.info('PowerPoint API不可用，请确保使用支持的Office版本');
+    }
   } catch (error) {
     console.error('应用排版模板失败:', error)
     ElMessage.error('应用排版模板失败: ' + (error as Error).message)
@@ -626,13 +770,251 @@ async function applyLayoutTemplateToPowerPoint(index: number) {
   }
 }
 
+// 应用上下布局
+async function applyVerticalLayout(context: any, slide: any, shapes: any[], shapeInfoList: any[], template: any) {
+  // 获取幻灯片尺寸
+  const slideWidth = 960; // PowerPoint幻灯片默认宽度（像素）
+  const slideHeight = 540; // PowerPoint幻灯片默认高度（像素）
+  
+  // 计算上下区域的分割点
+  const splitPoint = slideHeight * 0.45;
+  
+  // 按内容长度排序形状
+  const sortedInfo = [...shapeInfoList].sort((a, b) => b.textLength - a.textLength);
+  const sortedShapes = sortedInfo.map(info => info.shape);
+  
+  // 将形状分为标题和内容两组
+  const titleShapes = sortedShapes.slice(0, 1); // 第一个作为标题
+  const contentShapes = sortedShapes.slice(1); // 其余作为内容
+  
+  // 设置标题区域的形状
+  titleShapes.forEach((shape, index) => {
+    shape.left = slideWidth * 0.1;
+    shape.top = splitPoint * 0.4;
+    shape.width = slideWidth * 0.8;
+    shape.height = splitPoint * 0.5;
+    
+    // 设置字体
+    if (shape.hasTextFrame && shape.textFrame && shape.textFrame.textRange) {
+      const textRange = shape.textFrame.textRange;
+      const font = textRange.font;
+      font.name = '微软雅黑';
+      font.size = 28;
+      font.bold = true;
+      font.color = template.titleColor;
+      textRange.paragraphFormat.horizontalAlignment = PowerPoint.Alignment.center;
+    }
+  });
+  
+  // 设置内容区域的形状
+  contentShapes.forEach((shape, index) => {
+    shape.left = slideWidth * 0.1;
+    shape.top = splitPoint + 20 + (index * 80);
+    shape.width = slideWidth * 0.8;
+    shape.height = 60;
+    
+    // 设置字体
+    if (shape.hasTextFrame && shape.textFrame && shape.textFrame.textRange) {
+      const textRange = shape.textFrame.textRange;
+      const font = textRange.font;
+      font.name = '微软雅黑';
+      font.size = 16;
+      font.bold = false;
+      font.color = template.subtitleColor;
+      textRange.paragraphFormat.horizontalAlignment = PowerPoint.Alignment.left;
+    }
+  });
+  
+  await context.sync();
+}
+
+// 应用左右布局
+async function applyHorizontalLayout(context: any, slide: any, shapes: any[], shapeInfoList: any[], template: any) {
+  // 获取幻灯片尺寸
+  const slideWidth = 960;
+  const slideHeight = 540;
+  
+  // 计算左右区域的分割点
+  const splitPoint = slideWidth * 0.35;
+  
+  // 按内容长度排序形状
+  const sortedInfo = [...shapeInfoList].sort((a, b) => a.textLength - b.textLength);
+  const sortedShapes = sortedInfo.map(info => info.shape);
+  
+  // 将形状分为标题和内容两组
+  const titleShapes = sortedShapes.slice(0, 1); // 最短的作为标题
+  const contentShapes = sortedShapes.slice(1); // 其余作为内容
+  
+  // 设置左侧标题区域的形状
+  titleShapes.forEach((shape, index) => {
+    shape.left = 20;
+    shape.top = slideHeight * 0.3;
+    shape.width = splitPoint - 40;
+    shape.height = slideHeight * 0.4;
+    
+    // 设置字体
+    if (shape.hasTextFrame && shape.textFrame && shape.textFrame.textRange) {
+      const textRange = shape.textFrame.textRange;
+      const font = textRange.font;
+      font.name = '微软雅黑';
+      font.size = 24;
+      font.bold = true;
+      font.color = template.titleColor;
+      textRange.paragraphFormat.horizontalAlignment = PowerPoint.Alignment.center;
+    }
+  });
+  
+  // 设置右侧内容区域的形状
+  contentShapes.forEach((shape, index) => {
+    shape.left = splitPoint + 20;
+    shape.top = 40 + (index * 70);
+    shape.width = slideWidth - splitPoint - 60;
+    shape.height = 55;
+    
+    // 设置字体
+    if (shape.hasTextFrame && shape.textFrame && shape.textFrame.textRange) {
+      const textRange = shape.textFrame.textRange;
+      const font = textRange.font;
+      font.name = '微软雅黑';
+      font.size = 15;
+      font.bold = false;
+      font.color = template.subtitleColor;
+      textRange.paragraphFormat.horizontalAlignment = PowerPoint.Alignment.left;
+    }
+  });
+  
+  await context.sync();
+}
+
+// 应用居中布局
+async function applyCenterLayout(context: any, slide: any, shapes: any[], shapeInfoList: any[], template: any) {
+  // 获取幻灯片尺寸
+  const slideWidth = 960;
+  const slideHeight = 540;
+  
+  // 按内容长度排序形状
+  const sortedInfo = [...shapeInfoList].sort((a, b) => b.textLength - a.textLength);
+  const sortedShapes = sortedInfo.map(info => info.shape);
+  
+  // 将形状分为标题和内容两组
+  const titleShapes = sortedShapes.slice(0, 1); // 最长的作为标题
+  const contentShapes = sortedShapes.slice(1); // 其余作为内容
+  
+  // 设置标题形状（居中）
+  titleShapes.forEach((shape, index) => {
+    shape.left = slideWidth * 0.15;
+    shape.top = slideHeight * 0.3;
+    shape.width = slideWidth * 0.7;
+    shape.height = slideHeight * 0.2;
+    
+    // 设置字体
+    if (shape.hasTextFrame && shape.textFrame && shape.textFrame.textRange) {
+      const textRange = shape.textFrame.textRange;
+      const font = textRange.font;
+      font.name = '微软雅黑';
+      font.size = 32;
+      font.bold = true;
+      font.color = template.titleColor;
+      textRange.paragraphFormat.horizontalAlignment = PowerPoint.Alignment.center;
+    }
+  });
+  
+  // 设置内容形状（标题下方居中）
+  contentShapes.forEach((shape, index) => {
+    shape.left = slideWidth * 0.2;
+    shape.top = slideHeight * 0.55 + (index * 50);
+    shape.width = slideWidth * 0.6;
+    shape.height = 45;
+    
+    // 设置字体
+    if (shape.hasTextFrame && shape.textFrame && shape.textFrame.textRange) {
+      const textRange = shape.textFrame.textRange;
+      const font = textRange.font;
+      font.name = '微软雅黑';
+      font.size = 16;
+      font.bold = false;
+      font.color = template.subtitleColor;
+      textRange.paragraphFormat.horizontalAlignment = PowerPoint.Alignment.center;
+    }
+  });
+  
+  await context.sync();
+}
+
+// 应用环形布局
+async function applyCircularLayout(context: any, slide: any, shapes: any[], shapeInfoList: any[], template: any) {
+  // 获取幻灯片尺寸
+  const slideWidth = 960;
+  const slideHeight = 540;
+  
+  // 中心点坐标
+  const centerX = slideWidth / 2;
+  const centerY = slideHeight / 2;
+  
+  // 环形半径
+  const radius = Math.min(slideWidth, slideHeight) * 0.25;
+  
+  // 按内容长度排序形状，最短的放在中心
+  const sortedInfo = [...shapeInfoList].sort((a, b) => a.textLength - b.textLength);
+  const sortedShapes = sortedInfo.map(info => info.shape);
+  
+  // 中心形状（最短的）
+  const centerShape = sortedShapes[0];
+  const surroundingShapes = sortedShapes.slice(1);
+  
+  // 设置中心形状
+  if (centerShape) {
+    centerShape.left = centerX - 60;
+    centerShape.top = centerY - 30;
+    centerShape.width = 120;
+    centerShape.height = 60;
+    
+    // 设置字体
+    if (centerShape.hasTextFrame && centerShape.textFrame && centerShape.textFrame.textRange) {
+      const textRange = centerShape.textFrame.textRange;
+      const font = textRange.font;
+      font.name = '微软雅黑';
+      font.size = 20;
+      font.bold = true;
+      font.color = '#1890ff';
+      textRange.paragraphFormat.horizontalAlignment = PowerPoint.Alignment.center;
+    }
+  }
+  
+  // 设置周围形状（环形分布）
+  const angleStep = (Math.PI * 2) / surroundingShapes.length;
+  surroundingShapes.forEach((shape, index) => {
+    const angle = angleStep * index - Math.PI / 2; // 从顶部开始
+    const x = centerX + radius * Math.cos(angle) - 80;
+    const y = centerY + radius * Math.sin(angle) - 25;
+    
+    shape.left = x;
+    shape.top = y;
+    shape.width = 160;
+    shape.height = 50;
+    
+    // 设置字体
+    if (shape.hasTextFrame && shape.textFrame && shape.textFrame.textRange) {
+      const textRange = shape.textFrame.textRange;
+      const font = textRange.font;
+      font.name = '微软雅黑';
+      font.size = 14;
+      font.bold = false;
+      font.color = template.titleColor;
+      textRange.paragraphFormat.horizontalAlignment = PowerPoint.Alignment.center;
+    }
+  });
+  
+  await context.sync();
+}
+
 // ===== 排版推荐 =====
 interface LayoutRecommendation {
   name: string
   bgColor: string
   titleColor: string
   subtitleColor: string
-  layoutType: string
+  layoutType: 'vertical' | 'horizontal' | 'center' | 'circular' | 'left' | 'center-bottom'
   decorator: string
 }
 
@@ -640,125 +1022,77 @@ const selectedLayout = ref<number | null>(null)
 
 // 所有可用的排版模板
 const allLayoutTemplates: LayoutRecommendation[] = [
-  // 1. 白底 + 蓝色三角装饰（左对齐标题）
+  // 1. 上下布局 - 标题在上，内容在下
   {
-    name: '简约白底',
+    name: '上下布局',
     bgColor: '#ffffff',
     titleColor: '#222',
-    subtitleColor: '#999',
-    layoutType: 'left',
+    subtitleColor: '#666',
+    layoutType: 'vertical',
     decorator: `
-      <svg width="100%" height="100%" viewBox="0 0 160 90" preserveAspectRatio="none" style="position:absolute;bottom:0;right:0;">
-        <polygon points="160,40 160,90 100,90" fill="#1890ff"/>
-      </svg>
-      <div style="position:absolute;top:8px;left:12px;right:12px;bottom:8px;border:1px solid #e5e6eb;"></div>
+      <div style="position:absolute;top:0;left:0;right:0;height:45%;border-bottom:1px dashed #e5e5e5;"></div>
+      <div style="position:absolute;top:20%;left:50%;transform:translate(-50%,-50%);width:60%;text-align:center;">
+        <div style="font-size:20px;font-weight:bold;color:#222;">标题区域</div>
+      </div>
+      <div style="position:absolute;top:60%;left:10%;right:10%;">
+        <div style="font-size:14px;color:#666;">内容区域</div>
+      </div>
     `,
   },
-  // 2. 深色 + 圆环装饰（居中）
+  // 2. 左右布局 - 标题在左，内容在右
   {
-    name: '深色圆环',
+    name: '左右布局',
+    bgColor: '#f8f9fa',
+    titleColor: '#1890ff',
+    subtitleColor: '#555',
+    layoutType: 'horizontal',
+    decorator: `
+      <div style="position:absolute;top:0;bottom:0;left:0;width:35%;border-right:2px solid #1890ff;background:#fff;"></div>
+      <div style="position:absolute;top:50%;left:17.5%;transform:translate(-50%,-50%);width:28%;text-align:center;">
+        <div style="font-size:18px;font-weight:bold;color:#1890ff;">标题</div>
+      </div>
+      <div style="position:absolute;top:15%;left:40%;right:8%;bottom:15%;">
+        <div style="font-size:13px;color:#555;">内容区域</div>
+      </div>
+    `,
+  },
+  // 3. 居中布局 - 标题和内容都居中
+  {
+    name: '居中布局1',
     bgColor: '#1a1a2e',
     titleColor: '#fff',
-    subtitleColor: '#888',
-    layoutType: 'center',
-    decorator: `
-      <svg width="100%" height="100%" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid meet" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:70px;height:70px;opacity:0.7;">
-        <circle cx="35" cy="35" r="32" fill="none" stroke="#fff" stroke-width="1"/>
-        <circle cx="35" cy="35" r="26" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="0.5"/>
-        <circle cx="35" cy="35" r="20" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
-      </svg>
-      <svg viewBox="0 0 60 16" style="position:absolute;top:14px;left:10px;width:30px;height:8px;opacity:0.3;">
-        <path d="M0,8 Q7,2 15,8 T30,8 T45,8 T60,8" fill="none" stroke="#fff" stroke-width="1"/>
-      </svg>
-      <div style="position:absolute;top:22px;left:18px;width:5px;height:5px;border-radius:50%;background:#f59e42;opacity:0.8;"></div>
-      <div style="position:absolute;bottom:24px;right:28px;width:4px;height:4px;border-radius:50%;background:#fff;opacity:0.5;"></div>
-      <svg viewBox="0 0 16 16" style="position:absolute;bottom:12px;right:14px;width:16px;height:16px;opacity:0.2;">
-        <circle cx="3" cy="3" r="1" fill="#fff"/><circle cx="9" cy="3" r="1" fill="#fff"/><circle cx="15" cy="3" r="1" fill="#fff"/>
-        <circle cx="3" cy="9" r="1" fill="#fff"/><circle cx="9" cy="9" r="1" fill="#fff"/><circle cx="15" cy="9" r="1" fill="#fff"/>
-      </svg>
-    `,
-  },
-  // 3. 黑色 + 白色波浪分割（左对齐）
-  {
-    name: '暗夜波浪',
-    bgColor: '#111',
-    titleColor: '#eee',
-    subtitleColor: '#999',
-    layoutType: 'left',
-    decorator: `
-      <svg width="100%" height="100%" viewBox="0 0 160 90" preserveAspectRatio="none" style="position:absolute;bottom:0;left:0;">
-        <path d="M0,65 Q20,55 40,62 T80,58 T120,64 T160,56 L160,90 L0,90 Z" fill="#e0e0e0"/>
-        <path d="M0,72 Q25,66 50,70 T100,67 T150,73 L160,68 L160,90 L0,90 Z" fill="#bbb"/>
-      </svg>
-    `,
-  },
-  // 4. 浅灰白 + 圆形边框（居中）
-  {
-    name: '素雅椭圆',
-    bgColor: '#fafafa',
-    titleColor: '#333',
     subtitleColor: '#aaa',
     layoutType: 'center',
     decorator: `
-      <svg width="100%" height="100%" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid meet" style="position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);width:80px;height:46px;">
-        <ellipse cx="40" cy="23" rx="38" ry="21" fill="none" stroke="#ddd" stroke-width="1"/>
+      <svg width="100%" height="100%" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid meet" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100px;height:100px;opacity:0.2;">
+        <circle cx="50" cy="45" r="45" fill="none" stroke="#fff" stroke-width="1"/>
+        <circle cx="50" cy="45" r="35" fill="none" stroke="#fff" stroke-width="0.5"/>
+        <circle cx="50" cy="45" r="25" fill="none" stroke="#fff" stroke-width="0.3"/>
       </svg>
-      <div style="position:absolute;bottom:26px;left:50%;transform:translateX(-50%);width:36px;height:1px;background:#e8b86d;"></div>
+      <div style="position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);width:80%;text-align:center;">
+        <div style="font-size:24px;font-weight:bold;color:#fff;margin-bottom:10px;">居中标题</div>
+        <div style="font-size:14px;color:#aaa;">副标题或描述</div>
+      </div>
     `,
   },
-  // 5. 深蓝渐变 + 几何装饰（居中偏下）
+  // 4. 环形布局 - 内容围绕中心排列
   {
-    name: '深海几何',
-    bgColor: 'linear-gradient(135deg, #0c2d48, #145374)',
-    titleColor: '#fff',
-    subtitleColor: 'rgba(255,255,255,0.6)',
-    layoutType: 'center-bottom',
-    decorator: `
-      <svg width="100%" height="100%" viewBox="0 0 160 90" preserveAspectRatio="none" style="position:absolute;top:0;right:0;opacity:0.15;">
-        <circle cx="140" cy="10" r="45" fill="rgba(255,255,255,0.08)"/>
-        <circle cx="130" cy="80" r="35" fill="rgba(255,255,255,0.05)"/>
-      </svg>
-      <svg viewBox="0 0 120 60" style="position:absolute;bottom:0;left:0;width:75px;height:38px;opacity:0.06;">
-        <rect x="0" y="0" width="120" height="60" fill="#fff" transform="skewY(-8) translate(0,8)"/>
-      </svg>
-    `,
-  },
-  // 6. 红色活力（左对齐）
-  {
-    name: '活力红',
+    name: '环形布局',
     bgColor: '#fff',
-    titleColor: '#222',
+    titleColor: '#333',
     subtitleColor: '#888',
-    layoutType: 'left',
+    layoutType: 'circular',
     decorator: `
-      <div style="position:absolute;top:0;left:0;width:6px;height:100%;background:linear-gradient(180deg,#ff4d4f,#ff7875);"></div>
-      <div style="position:absolute;bottom:16px;right:16px;width:24px;height:24px;border-radius:50%;background:rgba(255,77,79,0.12);"></div>
-    `,
-  },
-  // 7. 绿色清新（居中）
-  {
-    name: '清新绿',
-    bgColor: '#f6ffed',
-    titleColor: '#237804',
-    subtitleColor: '#73d13d',
-    layoutType: 'center',
-    decorator: `
-      <div style="position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:50%;background:rgba(82,196,26,0.15);"></div>
-      <div style="position:absolute;bottom:18px;left:16px;width:30px;height:2px;background:#b7eb8f;border-radius:1px;"></div>
-      <div style="position:absolute;bottom:14px;left:16px;width:18px;height:2px;background:#d9f7be;border-radius:1px;"></div>
-    `,
-  },
-  // 8. 渐变紫（居中偏下）
-  {
-    name: '梦幻紫',
-    bgColor: 'linear-gradient(135deg, #722ed1, #b37feb)',
-    titleColor: '#fff',
-    subtitleColor: 'rgba(255,255,255,0.7)',
-    layoutType: 'center-bottom',
-    decorator: `
-      <div style="position:absolute;top:10px;left:14px;width:10px;height:10px;border:1px solid rgba(255,255,255,0.3);border-radius:50%;"></div>
-      <div style="position:absolute;bottom:14px;right:16px;width:16px;height:16px;border:1px solid rgba(255,255,255,0.2);transform:rotate(45deg);"></div>
-      <div style="position:absolute;top:50%;right:14px;width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.15);"></div>
+      <svg width="100%" height="100%" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid meet" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:120px;height:120px;">
+        <circle cx="60" cy="60" r="40" fill="none" stroke="#1890ff" stroke-width="2"/>
+        <circle cx="60" cy="60" r="25" fill="#1890ff" opacity="0.1"/>
+        <circle cx="60" cy="60" r="8" fill="#1890ff"/>
+      </svg>
+      <div style="position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:#1890ff;"></div>
+      <div style="position:absolute;top:20%;left:50%;transform:translateX(-50%);font-size:12px;color:#333;font-weight:bold;">顶部</div>
+      <div style="position:absolute;top:50%;right:8%;transform:translateY(-50%);font-size:12px;color:#333;font-weight:bold;">右侧</div>
+      <div style="position:absolute;bottom:20%;left:50%;transform:translateX(-50%);font-size:12px;color:#333;font-weight:bold;">底部</div>
+      <div style="position:absolute;top:50%;left:8%;transform:translateY(-50%);font-size:12px;color:#333;font-weight:bold;">左侧</div>
     `,
   },
 ]
@@ -863,245 +1197,80 @@ function handleTextBoxFocus(index: number) {
 onMounted(() => { })
 onUnmounted(() => { })
 
-// 监听字体大小变化，同步到PowerPoint
-watch(fontSize, async (newSize) => {
-  if (!isOfficeContext()) {
+// 将对齐方式转为 PowerPoint API 枚举字符串
+function toPowerPointAlignment(value: string): string {
+  switch (value) {
+    case 'center': return 'Center'
+    case 'right': return 'Right'
+    case 'left': default: return 'Left'
+  }
+}
+
+// 通用的 PowerPoint 格式应用函数：通过 PowerPoint.run API 直接操作选中文本
+async function applyFormatToSelectedText(applyFn: (font: any, paragraphFormat: any) => void, successMsg: string) {
+  if (!isOfficeContext() || isReadingFromPPT) return
+
+  const Office = getOfficeContext()
+  const PowerPoint = Office.PowerPoint || (globalThis as any).PowerPoint
+  if (!PowerPoint) {
+    ElMessage.warning('PowerPoint API 不可用')
     return
   }
-  
+
   try {
-    const Office = getOfficeContext()
-    console.log('开始调整PowerPoint字体大小:', newSize)
-    
-    // 检查PowerPoint文档是否可用
-    if (!Office.context.document) {
-      console.error('PowerPoint文档不可用')
-      ElMessage.error('PowerPoint文档不可用')
-      return
-    }
-    
-    // 检查Office.js版本
-    console.log('Office.js版本:', Office.context.diagnostics.version)
-    
-    // 先获取当前选中的文本，然后使用相同的文本内容来设置字体大小
-    await new Promise<void>((resolve, reject) => {
-      Office.context.document.getSelectedDataAsync(
-        Office.CoercionType.Text,
-        (asyncResult) => {
-          if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-            console.log('当前选中的文本:', asyncResult.value)
-            console.log('选中的文本长度:', asyncResult.value.length)
-            
-            // 尝试设置选中的文本的字体大小，保持文本内容不变
-            Office.context.document.setSelectedDataAsync(
-              asyncResult.value, // 使用当前选中的文本，保持内容不变
-              {
-                coercionType: Office.CoercionType.Text,
-                font: {
-                  size: newSize
-                }
-              },
-              (setResult) => {
-                if (setResult.status === Office.AsyncResultStatus.Succeeded) {
-                  console.log('字体大小设置成功:', newSize)
-                  ElMessage.success('字体大小已调整为: ' + newSize)
-                  resolve()
-                } else {
-                  console.error('设置失败:', setResult.error)
-                  ElMessage.error('设置失败: ' + setResult.error.message)
-                  reject(new Error('设置失败: ' + setResult.error.message))
-                }
-              }
-            )
-          } else {
-            console.error('获取文本失败:', asyncResult.error)
-            ElMessage.warning('请先在PowerPoint中选中要调整字体大小的文本')
-            reject(new Error('获取文本失败: ' + asyncResult.error.message))
-          }
-        }
-      )
+    await PowerPoint.run(async (context: any) => {
+      const selectedTextRange = context.presentation.getSelectedTextRange()
+      context.load(selectedTextRange, 'text')
+      await context.sync()
+
+      if (!selectedTextRange.text || !selectedTextRange.text.trim()) {
+        ElMessage.warning('请先在PowerPoint中选中文本')
+        return
+      }
+
+      const font = selectedTextRange.font
+      const paragraphFormat = selectedTextRange.paragraphFormat
+      applyFn(font, paragraphFormat)
+      await context.sync()
+
+      ElMessage.success(successMsg)
     })
-  } catch (error) {
-    console.error('调整字体大小失败:', error)
-    ElMessage.error('调整字体大小失败: ' + (error as Error).message)
+  } catch (error: any) {
+    console.error('应用格式失败:', error)
+    ElMessage.error('应用格式失败: ' + (error.message || error))
   }
+}
+
+// 监听字体大小变化，同步到PowerPoint
+watch(fontSize, async (newSize) => {
+  await applyFormatToSelectedText(
+    (font) => { font.size = newSize },
+    '字体大小已调整为: ' + newSize
+  )
 })
 
 // 监听字体家族变化，同步到PowerPoint
 watch(fontFamily, async (newFamily) => {
-  if (!isOfficeContext()) {
-    return
-  }
-  
-  try {
-    const Office = getOfficeContext()
-    console.log('开始调整PowerPoint字体家族:', newFamily)
-    
-    // 检查PowerPoint文档是否可用
-    if (!Office.context.document) {
-      console.error('PowerPoint文档不可用')
-      ElMessage.error('PowerPoint文档不可用')
-      return
-    }
-    
-    // 检查Office.js版本
-    console.log('Office.js版本:', Office.context.diagnostics.version)
-    
-    // 先获取当前选中的文本，然后使用相同的文本内容来设置字体家族
-    await new Promise<void>((resolve, reject) => {
-      Office.context.document.getSelectedDataAsync(
-        Office.CoercionType.Text,
-        (asyncResult) => {
-          if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-            console.log('当前选中的文本:', asyncResult.value)
-            console.log('选中的文本长度:', asyncResult.value.length)
-            
-            // 尝试设置选中的文本的字体家族，保持文本内容不变
-            Office.context.document.setSelectedDataAsync(
-              asyncResult.value, // 使用当前选中的文本，保持内容不变
-              {
-                coercionType: Office.CoercionType.Text,
-                font: {
-                  name: newFamily
-                }
-              },
-              (setResult) => {
-                if (setResult.status === Office.AsyncResultStatus.Succeeded) {
-                  console.log('字体家族设置成功:', newFamily)
-                  ElMessage.success('字体家族已调整为: ' + newFamily)
-                  resolve()
-                } else {
-                  console.error('设置失败:', setResult.error)
-                  ElMessage.error('设置失败: ' + setResult.error.message)
-                  reject(new Error('设置失败: ' + setResult.error.message))
-                }
-              }
-            )
-          } else {
-            console.error('获取文本失败:', asyncResult.error)
-            ElMessage.warning('请先在PowerPoint中选中要调整字体家族的文本')
-            reject(new Error('获取文本失败: ' + asyncResult.error.message))
-          }
-        }
-      )
-    })
-  } catch (error) {
-    console.error('调整字体家族失败:', error)
-    ElMessage.error('调整字体家族失败: ' + (error as Error).message)
-  }
+  await applyFormatToSelectedText(
+    (font) => { font.name = newFamily },
+    '字体家族已调整为: ' + newFamily
+  )
 })
 
 // 监听粗体变化，同步到PowerPoint
 watch(isBold, async (newBold) => {
-  if (!isOfficeContext()) {
-    return
-  }
-  
-  try {
-    const Office = getOfficeContext()
-    console.log('开始调整PowerPoint粗体:', newBold)
-    
-    // 检查PowerPoint文档是否可用
-    if (!Office.context.document) {
-      console.error('PowerPoint文档不可用')
-      ElMessage.error('PowerPoint文档不可用')
-      return
-    }
-    
-    // 检查Office.js版本
-    console.log('Office.js版本:', Office.context.diagnostics.version)
-    
-    // 先获取当前选中的文本，然后使用相同的文本内容来设置粗体
-    await new Promise<void>((resolve, reject) => {
-      Office.context.document.getSelectedDataAsync(
-        Office.CoercionType.Text,
-        (asyncResult) => {
-          if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-            console.log('当前选中的文本:', asyncResult.value)
-            console.log('选中的文本长度:', asyncResult.value.length)
-            
-            // 尝试设置选中的文本的粗体，保持文本内容不变
-            Office.context.document.setSelectedDataAsync(
-              asyncResult.value, // 使用当前选中的文本，保持内容不变
-              {
-                coercionType: Office.CoercionType.Text,
-                font: {
-                  bold: newBold
-                }
-              },
-              (setResult) => {
-                if (setResult.status === Office.AsyncResultStatus.Succeeded) {
-                  console.log('粗体设置成功:', newBold)
-                  ElMessage.success('粗体已' + (newBold ? '开启' : '关闭'))
-                  resolve()
-                } else {
-                  console.error('设置失败:', setResult.error)
-                  ElMessage.error('设置失败: ' + setResult.error.message)
-                  reject(new Error('设置失败: ' + setResult.error.message))
-                }
-              }
-            )
-          } else {
-            console.error('获取文本失败:', asyncResult.error)
-            ElMessage.warning('请先在PowerPoint中选中要调整粗体的文本')
-            reject(new Error('获取文本失败: ' + asyncResult.error.message))
-          }
-        }
-      )
-    })
-  } catch (error) {
-    console.error('调整粗体失败:', error)
-    ElMessage.error('调整粗体失败: ' + (error as Error).message)
-  }
+  await applyFormatToSelectedText(
+    (font) => { font.bold = newBold },
+    newBold ? '粗体已开启' : '粗体已关闭'
+  )
 })
 
 // 监听对齐方式变化，同步到PowerPoint
 watch(align, async (newAlign) => {
-  if (!isOfficeContext()) {
-    return
-  }
-  
-  try {
-    const Office = getOfficeContext()
-    console.log('开始调整PowerPoint对齐方式:', newAlign)
-    
-    // 检查PowerPoint文档是否可用
-    if (!Office.context.document) {
-      console.error('PowerPoint文档不可用')
-      ElMessage.error('PowerPoint文档不可用')
-      return
-    }
-    
-    // 尝试使用不同的方法调整对齐方式
-    try {
-      console.log('尝试使用setSelectedDataAsync方法')
-      
-      // 直接使用setSelectedDataAsync方法，不先获取文本
-      await new Promise<void>((resolve, reject) => {
-        Office.context.document.setSelectedDataAsync(
-          '', // 空字符串，只调整格式
-          {
-            coercionType: Office.CoercionType.Text
-          },
-          (setResult) => {
-            if (setResult.status === Office.AsyncResultStatus.Succeeded) {
-              console.log('对齐方式调整成功:', newAlign)
-              ElMessage.success('对齐方式已调整为: ' + newAlign)
-              resolve()
-            } else {
-              console.error('设置失败:', setResult.error)
-              reject(new Error('设置失败: ' + setResult.error.message))
-            }
-          }
-        )
-      })
-    } catch (error) {
-      console.error('调整对齐方式失败:', error)
-      ElMessage.error('调整对齐方式失败: ' + (error as Error).message)
-    }
-  } catch (error) {
-    console.error('调整对齐方式失败:', error)
-  }
+  await applyFormatToSelectedText(
+    (_font, paragraphFormat) => { paragraphFormat.horizontalAlignment = toPowerPointAlignment(newAlign) },
+    '对齐方式已调整为: ' + newAlign
+  )
 })
 </script>
 

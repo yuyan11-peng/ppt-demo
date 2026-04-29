@@ -115,5 +115,12 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
 }
+
+/* 确保子页面内容自适应 */
+.page-container > * {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 </style>
 
