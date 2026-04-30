@@ -40,6 +40,13 @@
               </el-card>
             </el-col>
           </el-row>
+
+          <!-- AI图标生成按钮 -->
+          <div class="ai-generate-section">
+            <el-button type="primary" class="ai-generate-btn" @click="generateIcon">
+              AI图标生成
+            </el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -64,6 +71,10 @@ const iconList = [
 
 function handleInsertIcon(icon: { char: string; name: string }) {
   ElMessage.info(`已选择图标: ${icon.name}`)
+}
+
+function generateIcon() {
+  router.push('/ai/icon')
 }
 </script>
 
@@ -144,4 +155,16 @@ function handleInsertIcon(icon: { char: string; name: string }) {
 
 .icon-char { font-size: 16px; line-height: 1; }
 .icon-name { font-size: 9px; color: #777; }
+
+/* AI生成按钮 */
+.ai-generate-section { padding: 4px 0 10px; }
+
+.ai-generate-btn {
+  width: 100%;
+  height: 30px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+}
 </style>

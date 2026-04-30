@@ -51,6 +51,17 @@
       <div class="home-card-title">排版优化</div>
       <div class="home-card-desc">统一格式，美化布局</div>
     </div>
+
+    <div class="home-card" @click="navigateTo('/ai/icon')">
+      <div class="home-card-icon">
+        <svg viewBox="0 0 48 48" width="36" height="36" fill="none">
+          <rect x="10" y="10" width="28" height="28" rx="4" fill="#fff" stroke="#67c23a" stroke-width="2"/>
+          <path d="M18 18v12h4v-8h4v8h4V18h-4v6h-4v-6h-4z" fill="#67c23a"/>
+        </svg>
+      </div>
+      <div class="home-card-title">AI图标生成</div>
+      <div class="home-card-desc">AI生成矢量图标素材</div>
+    </div>
   </div>
 </template>
 

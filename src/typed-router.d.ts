@@ -44,6 +44,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/ai/icon': RouteRecordInfo<
+      '/ai/icon',
+      '/ai/icon',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/ai/image': RouteRecordInfo<
       '/ai/image',
       '/ai/image',
@@ -135,6 +142,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/ai/generate.vue': {
       routes:
         | '/ai/generate'
+      views:
+        | never
+    }
+    'src/pages/ai/icon.vue': {
+      routes:
+        | '/ai/icon'
       views:
         | never
     }

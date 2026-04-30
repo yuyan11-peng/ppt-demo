@@ -79,6 +79,13 @@
               </el-card>
             </el-col>
           </el-row>
+
+          <!-- AI图标生成按钮 -->
+          <div class="ai-generate-section">
+            <el-button type="primary" class="ai-generate-btn" @click="goToAIIcon">
+              AI图标生成
+            </el-button>
+          </div>
         </div>
       </div>
 
@@ -210,6 +217,16 @@ function handleSelectImage(img: ImageItem) {
 function goToAIImage() {
   router.push({
     path: '/material/ai-image',
+    query: {
+      returnTo: route.fullPath,
+      t: Date.now().toString(),
+    },
+  })
+}
+
+function goToAIIcon() {
+  router.push({
+    path: '/ai/icon',
     query: {
       returnTo: route.fullPath,
       t: Date.now().toString(),
