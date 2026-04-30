@@ -46,6 +46,8 @@ onMounted(() => {
         'templates': '/material/template',
         'template': '/material/template',
         'images': '/material/images',
+        'material-aiimage': '/material/ai-image',
+        'material-ai-image': '/material/ai-image',
         'icons': '/material/icons',
         'sidebar': '/ai',
       }

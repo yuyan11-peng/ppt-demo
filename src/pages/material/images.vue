@@ -70,11 +70,12 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Document, Grid, Picture, List, OfficeBuilding, Cpu, Sunny, UserFilled } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 
 // ===== 分类和数据 =====
 interface ImageItem {
@@ -115,7 +116,13 @@ function handleSelectImage(img: ImageItem) {
 }
 
 function goToAIImage() {
-  router.push('/ai/image')
+  router.push({
+    path: '/material/ai-image',
+    query: {
+      returnTo: route.fullPath,
+      t: Date.now().toString(),
+    },
+  })
 }
 </script>
 

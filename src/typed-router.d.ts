@@ -79,6 +79,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/material/ai-image': RouteRecordInfo<
+      '/material/ai-image',
+      '/material/ai-image',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/material/icons': RouteRecordInfo<
       '/material/icons',
       '/material/icons',
@@ -158,6 +165,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/material/index.vue': {
       routes:
         | '/material/'
+      views:
+        | never
+    }
+    'src/pages/material/ai-image.vue': {
+      routes:
+        | '/material/ai-image'
       views:
         | never
     }
