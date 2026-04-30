@@ -1,23 +1,47 @@
 <template>
-  <div class="sub-page">
-    <div class="page-header">
-      <el-button :icon="ArrowLeft" text @click="router.push('/material')" />
-      <span class="page-title">图标素材</span>
+  <div class="material-page">
+    <!-- 子Tab栏 -->
+    <div class="sub-tabs">
+      <div class="sub-tab-item" @click="router.push('/material')">
+        <el-icon><Document /></el-icon>
+        <span>模板</span>
+      </div>
+      <div class="sub-tab-item active">
+        <el-icon><Grid /></el-icon>
+        <span>图标</span>
+      </div>
+      <div class="sub-tab-item" @click="router.push('/material')">
+        <el-icon><Picture /></el-icon>
+        <span>图片</span>
+      </div>
     </div>
-    <div class="page-body">
-      <el-row :gutter="10">
-        <el-col :span="6" v-for="(icon, idx) in iconList" :key="idx">
-          <el-card
-            shadow="hover"
-            class="icon-item-card"
-            :body-style="{ padding: '0', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }"
-            @click="handleInsertIcon(icon)"
-          >
-            <span class="icon-char">{{ icon.char }}</span>
-            <span class="icon-name">{{ icon.name }}</span>
-          </el-card>
-        </el-col>
-      </el-row>
+
+    <div class="material-content">
+      <div class="tab-panel">
+        <div class="panel-header">
+          <span class="panel-title">图标素材</span>
+          <div class="view-toggles">
+            <el-icon :color="'#1890ff'"><Grid /></el-icon>
+            <el-icon color="#999"><List /></el-icon>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <el-row :gutter="5">
+            <el-col :span="6" v-for="(icon, idx) in iconList" :key="idx">
+              <el-card
+                shadow="hover"
+                class="icon-item-card"
+                :body-style="{ padding: '0', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }"
+                @click="handleInsertIcon(icon)"
+              >
+                <span class="icon-char">{{ icon.char }}</span>
+                <span class="icon-name">{{ icon.name }}</span>
+              </el-card>
+            </el-col>
+          </el-row>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -25,7 +49,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { Document, Grid, Picture, List } from '@element-plus/icons-vue'
 
 const router = useRouter()
 
@@ -44,45 +68,80 @@ function handleInsertIcon(icon: { char: string; name: string }) {
 </script>
 
 <style scoped>
-.sub-page {
-  height: 100vh;
+.material-page {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: #fff;
 }
 
-.page-header {
+.sub-tabs {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border-bottom: 1px solid #eee;
+  gap: 6px;
+  padding: 8px 12px 6px;
   flex-shrink: 0;
 }
 
-.page-title {
-  font-size: 15px;
+.sub-tab-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s;
+  border: 1.5px solid #e8e8e8;
+  font-weight: 500;
+}
+
+.sub-tab-item:hover { color: #1890ff; border-color: #bae7ff; }
+.sub-tab-item.active { background: #1890ff; color: #fff; border-color: #1890ff; }
+
+.material-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+}
+
+.tab-panel { display: flex; flex-direction: column; }
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px 8px;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 13px;
   font-weight: 600;
   color: #333;
 }
 
-.page-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 16px;
+.view-toggles {
+  display: flex;
+  gap: 5px;
+  align-items: center;
 }
+.view-toggles .el-icon { cursor: pointer; font-size: 14px !important; }
+
+.panel-body { flex: 1; }
 
 .icon-item-card {
-  border-radius: 10px;
-  margin-bottom: 10px;
+  border-radius: 8px;
+  margin-bottom: 6px;
   aspect-ratio: 1;
 }
 
 .icon-item-card :deep(.el-card__body) {
-  padding: 12px 4px !important;
+  padding: 6px 2px !important;
   background: #f8f9fc;
 }
 
-.icon-char { font-size: 24px; line-height: 1; }
-.icon-name { font-size: 11px; color: #777; }
+.icon-char { font-size: 16px; line-height: 1; }
+.icon-name { font-size: 9px; color: #777; }
 </style>
